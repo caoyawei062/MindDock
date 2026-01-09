@@ -44,63 +44,66 @@ const items = [
 
 export function AppSidebar() {
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="p-2">
-        <div className="flex items-center gap-2">
-          <img src={logoSrc} alt="App Logo" className="size-7 shrink-0" />
-          <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
-            MindDock
-          </span>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>个人收藏</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
+    <div className="h-full">
+      <div className="h-10 bg-(--background) drag"></div>
+      <Sidebar collapsible="icon" className="pt-10 drag">
+        <SidebarHeader className="p-2 select-none">
+          <div className="flex items-center gap-2">
+            <img src={logoSrc} alt="App Logo" className="size-7 shrink-0 rounded-md" />
+            <span className="font-semibold text-lg group-data-[collapsible=icon]:hidden">
+              MindDock
+            </span>
+          </div>
+        </SidebarHeader>
+        <SidebarContent className="select-none">
+          <SidebarGroup>
+            <SidebarGroupLabel>个人收藏</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <a href={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupLabel>文件夹</SidebarGroupLabel>
+            <SidebarGroupContent></SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton>
+                    <User2 /> Username
+                    <ChevronUp className="ml-auto" />
                   </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>文件夹</SidebarGroupLabel>
-          <SidebarGroupContent></SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton>
-                  <User2 /> Username
-                  <ChevronUp className="ml-auto" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" className="w-[--radix-popper-anchor-width]">
-                <DropdownMenuItem>
-                  <span>Account</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <span>Billing</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <span>Sign out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-    </Sidebar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" className="w-[--radix-popper-anchor-width]">
+                  <DropdownMenuItem>
+                    <span>Account</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <span>Billing</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+      </Sidebar>
+    </div>
   )
 }

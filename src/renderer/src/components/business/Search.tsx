@@ -4,7 +4,7 @@ import { Keyboard, PenLine, SearchIcon, Space } from 'lucide-react'
 import { Button } from '../ui/button'
 const Search: React.FC = () => {
   return (
-    <div className="p-3 border-b dark:border-border-dark">
+    <div className="p-3 border-b dark:border-border-dark drag">
       <InputGroup>
         <InputGroupInput placeholder="快速定位内容" />
         <InputGroupAddon>

@@ -1,8 +1,12 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-
+import { CHANGETHEME, THEME } from '../constants/index'
 // Custom APIs for renderer
-const api = {}
+const api = {
+  changeTheme: (theme: THEME) => {
+    ipcRenderer.send(CHANGETHEME, theme)
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
