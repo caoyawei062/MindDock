@@ -1,10 +1,13 @@
+import { SidebarProvider } from './components/ui/sidebar'
 import MainLayout from './Layout/MainLayout'
 
 function App(): React.JSX.Element {
   return (
-    <>
-      <MainLayout></MainLayout>
-    </>
+    <div className="w-screen h-screen">
+      <SidebarProvider>
+        <MainLayout></MainLayout>
+      </SidebarProvider>
+    </div>
   )
 }
 
