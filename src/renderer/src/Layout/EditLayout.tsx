@@ -1,11 +1,19 @@
 import React, { useCallback, useState } from 'react'
 import EditToolHeader from '../components/business/Edit/EditToolHeader'
 import Tiptap from '../components/business/Edit/Tiptap'
+import Codemirror from '../components/business/Edit/Codemirror'
 import OutlineView from '../components/business/Edit/OutlineView'
 import ScrollArea from '@renderer/components/ui/scroll-area'
 import { useEditorContext } from '@renderer/provider/EditorProvider'
 import { cn } from '@/lib/utils'
 import { ChartNoAxesGantt } from 'lucide-react'
+import {
+  EditorMode,
+  CodeMirrorConfig,
+  DEFAULT_CODEMIRROR_CONFIG,
+  DEFAULT_LANGUAGES
+} from '../components/business/Edit/types'
+import { type TagItem } from '../components/business/Edit/TagInputDropdown'
 
 // 窄屏阈值（像素）
 const NARROW_THRESHOLD = 500
@@ -14,6 +22,12 @@ const EditLayout = () => {
   const { outlineOpen, outlineItems, editor } = useEditorContext()
   const [containerWidth, setContainerWidth] = React.useState(0)
   const [hoverOutline, setHoverOutline] = useState(false)
+  const [editorMode, setEditorMode] = useState<EditorMode>('code')
+  const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGES[0].id)
+  const [codeMirrorConfig, setCodeMirrorConfig] =
+    useState<CodeMirrorConfig>(DEFAULT_CODEMIRROR_CONFIG)
+  const [codeContent, setCodeContent] = useState('')
+  const [tags, setTags] = useState<TagItem[]>([])
   const containerRef = React.useRef<HTMLDivElement>(null)
 
   // 监听容器宽度
@@ -56,7 +70,17 @@ const EditLayout = () => {
 
   return (
     <div ref={containerRef} className="h-screen flex flex-col">
-      <EditToolHeader />
+      <EditToolHeader
+        mode={editorMode}
+        onModeChange={setEditorMode}
+        languages={DEFAULT_LANGUAGES}
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={setSelectedLanguage}
+        codeMirrorConfig={codeMirrorConfig}
+        onCodeMirrorConfigChange={setCodeMirrorConfig}
+        tags={tags}
+        onTagsChange={setTags}
+      />
       <div className="flex-1 flex overflow-hidden relative">
         {/* 大纲视图 - 宽屏内嵌 */}
         {!isNarrow && outlineOpen && (
@@ -109,7 +133,16 @@ const EditLayout = () => {
             isNarrow && outlineOpen && 'pl-8'
           )}
         >
-          <Tiptap />
+          {editorMode === 'word' ? (
+            <Tiptap />
+          ) : (
+            <Codemirror
+              value={codeContent}
+              onChange={setCodeContent}
+              language={selectedLanguage}
+              config={codeMirrorConfig}
+            />
+          )}
         </ScrollArea>
       </div>
     </div>
