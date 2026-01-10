@@ -4,6 +4,7 @@ import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import Image from '@tiptap/extension-image'
 import { common, createLowlight } from 'lowlight'
 import {
   Bold,
@@ -65,6 +66,13 @@ const Tiptap: React.FC = () => {
       }).configure({
         lowlight,
         defaultLanguage: 'plaintext'
+      }),
+      Image.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'rounded-lg max-w-full'
+        }
       })
     ],
     content: '',

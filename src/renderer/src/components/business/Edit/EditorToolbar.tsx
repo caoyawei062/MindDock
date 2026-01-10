@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { Editor } from '@tiptap/react'
 import {
   Bold,
@@ -15,7 +15,8 @@ import {
   Redo2,
   RemoveFormatting,
   Minus,
-  CodeSquare
+  CodeSquare,
+  ImageIcon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ScrollArea from '@renderer/components/ui/scroll-area'
@@ -59,6 +60,24 @@ const ToolbarButton = ({
 const ToolbarDivider = () => <div className="w-px h-5 bg-border mx-1 shrink-0" />
 
 const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  // 处理图片选择
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = reader.result as string
+      editor.chain().focus().setImage({ src: base64 }).run()
+    }
+    reader.readAsDataURL(file)
+
+    // 清空 input 以便可以重复选择同一文件
+    e.target.value = ''
+  }
+
   return (
     <ScrollArea
       orientation="horizontal"
@@ -171,6 +190,16 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
         >
           <Minus size={16} />
         </ToolbarButton>
+        <ToolbarButton onClick={() => imageInputRef.current?.click()} tooltip="插入图片">
+          <ImageIcon size={16} />
+        </ToolbarButton>
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          className="hidden"
+        />
 
         <ToolbarDivider />
 
