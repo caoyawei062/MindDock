@@ -4,18 +4,22 @@ import { AppSidebar } from '@/components/business/SideBar'
 import FloatBall from '@renderer/components/business/FloatBall'
 import ListLayout from './ListLayout'
 import EditLayout from './EditLayout'
+import { EditorProvider } from '@renderer/provider/EditorProvider'
+
 const MainLayout: React.FC = () => {
   return (
     <>
       <AppSidebar />
       <main className="w-full relative select-none">
         <ResizablePanelGroup orientation="horizontal" className="w-full">
-          <ResizablePanel defaultSize={30} minSize={'200px'} maxSize={'350px'}>
+          <ResizablePanel defaultSize={30} minSize={'250px'} maxSize={'500px'}>
             <ListLayout />
           </ResizablePanel>
           <ResizableHandle className="focus-visible:ring-0 focus-visible:ring-offset-0" />
           <ResizablePanel defaultSize={50} minSize={'300px'} className="select-text">
-            <EditLayout />
+            <EditorProvider>
+              <EditLayout />
+            </EditorProvider>
           </ResizablePanel>
         </ResizablePanelGroup>
         <FloatBall />

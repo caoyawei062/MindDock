@@ -5,9 +5,20 @@ import 'overlayscrollbars/overlayscrollbars.css'
 interface ScrollAreaProps {
   children: React.ReactNode
   className?: string
+  orientation?: 'vertical' | 'horizontal' | 'both'
 }
 
-const ScrollArea: React.FC<ScrollAreaProps> = ({ children, className }) => {
+const ScrollArea: React.FC<ScrollAreaProps> = ({
+  children,
+  className,
+  orientation = 'vertical'
+}) => {
+  const overflowOptions = {
+    vertical: { x: 'hidden' as const, y: 'scroll' as const },
+    horizontal: { x: 'scroll' as const, y: 'hidden' as const },
+    both: { x: 'scroll' as const, y: 'scroll' as const }
+  }
+
   return (
     <OverlayScrollbarsComponent
       className={className}
@@ -17,10 +28,7 @@ const ScrollArea: React.FC<ScrollAreaProps> = ({ children, className }) => {
           autoHideDelay: 400, // 隐藏延迟 400ms
           theme: 'os-theme-custom' // 使用自定义主题
         },
-        overflow: {
-          x: 'hidden',
-          y: 'scroll'
-        }
+        overflow: overflowOptions[orientation]
       }}
       defer
     >
