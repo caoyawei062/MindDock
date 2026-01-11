@@ -47,6 +47,16 @@ export function ThemeProvider({
     root.classList.add(theme)
   }, [theme])
 
+  // 监听来自主进程的主题变化（跨窗口同步）
+  useEffect(() => {
+    const unsubscribe = window.api.onThemeChanged((newTheme: string) => {
+      const validTheme = newTheme as Theme
+      localStorage.setItem(storageKey, validTheme)
+      setTheme(validTheme)
+    })
+    return () => unsubscribe()
+  }, [storageKey])
+
   const value = {
     theme,
     setTheme: (theme: Theme) => {

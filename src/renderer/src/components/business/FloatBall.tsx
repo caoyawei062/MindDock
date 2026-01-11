@@ -1,12 +1,11 @@
-import React from 'react'
-import {} from '@/components/ui/tooltip'
-import {} from 'lucide-react'
+
 import LogoSrc from '@/assets/logo.png'
+import { THEME } from '../../../../constants/index'
 import { useTheme } from '@renderer/provider/ThemeProvider'
 const FloatBall = () => {
   const { theme, setTheme } = useTheme()
   const changeTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark'
+    const newTheme = theme === 'dark' ? THEME.LIGHT : THEME.DARK
     setTheme(newTheme)
     window.api.changeTheme(newTheme)
   }

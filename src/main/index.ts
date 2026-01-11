@@ -3,10 +3,13 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { CHANGETHEME } from '../constants'
+import { initTray } from './tray'
+
+let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -23,7 +26,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow?.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -59,8 +62,19 @@ app.whenReady().then(() => {
   ipcMain.on(CHANGETHEME, (_, theme) => {
     console.log('Theme changed to:', theme)
     nativeTheme.themeSource = theme
+
+    // 广播主题变化到所有窗口
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('theme-changed', theme)
+    })
   })
+
   createWindow()
+
+  // 创建托盘（仅 macOS）
+  if (process.platform === 'darwin' && mainWindow) {
+    initTray(mainWindow)
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
