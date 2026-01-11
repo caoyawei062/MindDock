@@ -10,9 +10,9 @@ const MainLayout: React.FC = () => {
   return (
     <>
       <AppSidebar />
-      <main className="w-full relative select-none">
+      <main className="w-full relative select-none overflow-hidden">
         <ResizablePanelGroup orientation="horizontal" className="w-full">
-          <ResizablePanel defaultSize={30} minSize={'250px'} maxSize={'500px'}>
+          <ResizablePanel defaultSize={30} minSize={'220px'} maxSize={'350px'}>
             <ListLayout />
           </ResizablePanel>
           <ResizableHandle className="focus-visible:ring-0 focus-visible:ring-offset-0" />

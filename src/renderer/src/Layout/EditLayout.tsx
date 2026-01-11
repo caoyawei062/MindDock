@@ -22,7 +22,7 @@ const EditLayout = () => {
   const { outlineOpen, outlineItems, editor } = useEditorContext()
   const [containerWidth, setContainerWidth] = React.useState(0)
   const [hoverOutline, setHoverOutline] = useState(false)
-  const [editorMode, setEditorMode] = useState<EditorMode>('code')
+  const [editorMode, setEditorMode] = useState<EditorMode>('word')
   const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGES[0].id)
   const [codeMirrorConfig, setCodeMirrorConfig] =
     useState<CodeMirrorConfig>(DEFAULT_CODEMIRROR_CONFIG)
@@ -128,7 +128,7 @@ const EditLayout = () => {
         {/* 编辑器 */}
         <ScrollArea
           className={cn(
-            'flex-1',
+            'flex-1 w-full min-w-0 overflow-hidden',
             outlineOpen && !isNarrow && 'border-l-0',
             isNarrow && outlineOpen && 'pl-8'
           )}

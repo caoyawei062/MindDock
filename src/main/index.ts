@@ -10,7 +10,7 @@ function createWindow(): void {
     width: 900,
     height: 670,
     show: false,
-    minWidth: 770,
+    minWidth: 810,
     alwaysOnTop: true,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',

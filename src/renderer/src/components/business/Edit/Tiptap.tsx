@@ -78,7 +78,7 @@ const Tiptap: React.FC = () => {
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-full px-6 py-4'
+        class: 'prose prose-sm dark:prose-invert max-w-none w-full focus:outline-none min-h-full px-6 py-4'
       }
     },
     onUpdate: () => {
@@ -107,11 +107,11 @@ const Tiptap: React.FC = () => {
 
   return (
     <EditorContext.Provider value={providerValue}>
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full min-w-0 overflow-hidden">
         {/* 固定工具栏 */}
         {toolbarOpen && <EditorToolbar editor={editor} />}
 
-        <EditorContent editor={editor} className="flex-1 overflow-auto scrollbar-none" />
+        <EditorContent editor={editor} className="flex-1 min-w-0 overflow-auto scrollbar-none" />
         <BubbleMenu
           editor={editor}
           updateDelay={150}
@@ -119,89 +119,79 @@ const Tiptap: React.FC = () => {
         >
           <button
             onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('bold') ? 'bg-accent text-foreground' : 'text-muted-foreground'
-            }`}
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('bold') ? 'bg-accent text-foreground' : 'text-muted-foreground'
+              }`}
           >
             <Bold size={14} />
           </button>
           <button
             onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('italic') ? 'bg-accent text-foreground' : 'text-muted-foreground'
-            }`}
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('italic') ? 'bg-accent text-foreground' : 'text-muted-foreground'
+              }`}
           >
             <Italic size={14} />
           </button>
           <button
             onClick={() => editor.chain().focus().toggleStrike().run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('strike') ? 'bg-accent text-foreground' : 'text-muted-foreground'
-            }`}
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('strike') ? 'bg-accent text-foreground' : 'text-muted-foreground'
+              }`}
           >
             <Strikethrough size={14} />
           </button>
           <button
             onClick={() => editor.chain().focus().toggleCode().run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('code') ? 'bg-accent text-foreground' : 'text-muted-foreground'
-            }`}
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('code') ? 'bg-accent text-foreground' : 'text-muted-foreground'
+              }`}
           >
             <Code size={14} />
           </button>
           <div className="w-px h-4 bg-border mx-1" />
           <button
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('heading', { level: 1 })
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('heading', { level: 1 })
                 ? 'bg-accent text-foreground'
                 : 'text-muted-foreground'
-            }`}
+              }`}
           >
             <Heading1 size={14} />
           </button>
           <button
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('heading', { level: 2 })
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('heading', { level: 2 })
                 ? 'bg-accent text-foreground'
                 : 'text-muted-foreground'
-            }`}
+              }`}
           >
             <Heading2 size={14} />
           </button>
           <button
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('heading', { level: 3 })
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('heading', { level: 3 })
                 ? 'bg-accent text-foreground'
                 : 'text-muted-foreground'
-            }`}
+              }`}
           >
             <Heading3 size={14} />
           </button>
           <div className="w-px h-4 bg-border mx-1" />
           <button
             onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('bulletList') ? 'bg-accent text-foreground' : 'text-muted-foreground'
-            }`}
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('bulletList') ? 'bg-accent text-foreground' : 'text-muted-foreground'
+              }`}
           >
             <List size={14} />
           </button>
           <button
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('orderedList') ? 'bg-accent text-foreground' : 'text-muted-foreground'
-            }`}
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('orderedList') ? 'bg-accent text-foreground' : 'text-muted-foreground'
+              }`}
           >
             <ListOrdered size={14} />
           </button>
           <button
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`p-1.5 rounded hover:bg-accent transition-colors ${
-              editor.isActive('blockquote') ? 'bg-accent text-foreground' : 'text-muted-foreground'
-            }`}
+            className={`p-1.5 rounded hover:bg-accent transition-colors ${editor.isActive('blockquote') ? 'bg-accent text-foreground' : 'text-muted-foreground'
+              }`}
           >
             <Quote size={14} />
           </button>
