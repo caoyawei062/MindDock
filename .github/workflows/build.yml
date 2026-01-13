@@ -45,12 +45,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload artifacts
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
-        if: success()
+        if: success() && matrix.os == 'windows-latest'
         with:
-          name: ${{ matrix.os }}-build
-          path: dist/*
+          name: windows-build
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        if: success() && matrix.os == 'macos-latest'
+        with:
+          name: macos-build
+          path: |
+            dist/*.dmg
+            dist/*.zip
           if-no-files-found: error
           retention-days: 30
 

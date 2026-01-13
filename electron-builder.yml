@@ -17,6 +17,7 @@ win:
     - x64
   target:
     - target: nsis
+  sign: null
   signingHashAlgorithms: []
   signAndEditExecutable: false
 nsis:
@@ -35,8 +36,15 @@ mac:
   entitlements: null
   entitlementsInherit: null
   provisioningProfile: null
+  arch:
+    - x64
+    - arm64
+  target:
+    - dmg
+    - zip
+  artifactName: ${name}-${version}-${arch}.${ext}
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 linux:
   target:
     - AppImage
