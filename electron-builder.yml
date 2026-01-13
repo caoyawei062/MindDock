@@ -17,10 +17,8 @@ win:
     - x64
   target:
     - target: nsis
-  signingHashAlgorithms:
-    - sha256
-  sign: null
-  verifySignFlags: []
+  signingHashAlgorithms: []
+  signAndEditExecutable: false
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
