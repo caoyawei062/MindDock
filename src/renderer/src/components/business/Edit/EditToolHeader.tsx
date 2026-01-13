@@ -1,7 +1,14 @@
-import { ChartNoAxesGantt, Copy, Tag, Trash2, Save, PenTool, LucideIcon } from 'lucide-react'
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { ChartNoAxesGantt, Copy, Tag, Trash2, Save, PenTool, Download, LucideIcon } from 'lucide-react'
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { useEditorContext } from '@renderer/provider/EditorProvider'
+import { useExport } from '@renderer/provider/ExportProvider'
 import { cn } from '@/lib/utils'
 import {
   type EditorMode,
@@ -23,6 +30,7 @@ interface ToolButtonConfig {
   tooltip: string | (() => string)
   onClick?: () => void
   isActive?: boolean | (() => boolean)
+  disabled?: boolean
   variant?: 'default' | 'destructive' | 'primary'
   // 支持的模式，不设置表示所有模式都支持
   modes?: EditorMode[]
@@ -35,6 +43,8 @@ interface ToolButtonGroupConfig {
 }
 
 interface EditToolHeaderProps {
+  title: string
+  onTitleChange: (title: string) => void
   mode?: EditorMode
   onModeChange?: (mode: EditorMode) => void
   languages?: LanguageConfig[]
@@ -44,9 +54,14 @@ interface EditToolHeaderProps {
   onCodeMirrorConfigChange?: (config: CodeMirrorConfig) => void
   tags?: TagItem[]
   onTagsChange?: (tags: TagItem[]) => void
+  noteId?: string
+  onExport?: () => Promise<void>
+  noteType?: 'document' | 'snippet'
 }
 
 const EditToolHeader: React.FC<EditToolHeaderProps> = ({
+  title,
+  onTitleChange,
   mode = 'word',
   onModeChange: _onModeChange,
   languages = DEFAULT_LANGUAGES,
@@ -55,13 +70,58 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   codeMirrorConfig = DEFAULT_CODEMIRROR_CONFIG,
   onCodeMirrorConfigChange,
   tags = [],
-  onTagsChange
+  onTagsChange,
+  noteId,
+  noteType = 'document'
 }) => {
-  const { title, setTitle, outlineOpen, toggleOutline, toolbarOpen, toggleToolbar } =
-    useEditorContext()
+  const { outlineOpen, toggleOutline, toolbarOpen, toggleToolbar } = useEditorContext()
+  const { exportToPDF, exportToImage, exportToMarkdown } = useExport()
+  const [isExporting, setIsExporting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(title)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // 处理导出为 PDF
+  const handleExportPDF = useCallback(async () => {
+    if (!noteId || isExporting) return
+
+    try {
+      setIsExporting(true)
+      await exportToPDF(noteId)
+    } catch (error) {
+      console.error('Export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [noteId, isExporting, exportToPDF])
+
+  // 处理导出为图片
+  const handleExportImage = useCallback(async () => {
+    if (!noteId || isExporting) return
+
+    try {
+      setIsExporting(true)
+      await exportToImage(noteId)
+    } catch (error) {
+      console.error('Export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [noteId, isExporting, exportToImage])
+
+  // 处理导出为 Markdown (主要用于代码片段)
+  const handleExportMarkdown = useCallback(async () => {
+    if (!noteId || isExporting) return
+
+    try {
+      setIsExporting(true)
+      await exportToMarkdown(noteId)
+    } catch (error) {
+      console.error('Export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [noteId, isExporting, exportToMarkdown])
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -82,14 +142,14 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   const handleTitleBlur = () => {
     setIsEditing(false)
     const newTitle = editValue.trim() || '未命名文档'
-    setTitle(newTitle)
+    onTitleChange(newTitle)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       setIsEditing(false)
       const newTitle = editValue.trim() || '未命名文档'
-      setTitle(newTitle)
+      onTitleChange(newTitle)
     }
     if (e.key === 'Escape') {
       setIsEditing(false)
@@ -107,6 +167,12 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
             id: 'copy',
             icon: Copy,
             tooltip: '复制内容'
+          },
+          {
+            id: 'export',
+            icon: Download,
+            tooltip: '导出',
+            disabled: !noteId || isExporting
           },
           {
             id: 'outline',
@@ -149,7 +215,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
         ]
       }
     ],
-    [outlineOpen, toggleOutline, toolbarOpen, toggleToolbar]
+    [outlineOpen, toggleOutline, toolbarOpen, toggleToolbar, handleExportPDF, handleExportImage, handleExportMarkdown, noteId, isExporting]
   )
 
   // 根据模式过滤按钮
@@ -162,8 +228,12 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
     const Icon = btn.icon
     const tooltipText = typeof btn.tooltip === 'function' ? btn.tooltip() : btn.tooltip
     const isActive = typeof btn.isActive === 'function' ? btn.isActive() : btn.isActive
+    const isDisabled = btn.disabled || false
 
     const getButtonClassName = () => {
+      if (isDisabled) {
+        return 'opacity-50 cursor-not-allowed text-muted-foreground'
+      }
       if (isActive) {
         return 'bg-accent text-foreground'
       }
@@ -183,6 +253,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
         <TooltipTrigger asChild>
           <button
             onClick={btn.onClick}
+            disabled={isDisabled}
             className={cn('p-1.5 rounded-md transition-colors', getButtonClassName())}
           >
             <Icon size={16} />
@@ -232,6 +303,48 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   const renderButtonByType = (btn: ToolButtonConfig) => {
     if (btn.id === 'tag') {
       return renderTagButton(btn)
+    }
+    if (btn.id === 'export') {
+      const Icon = btn.icon
+      const isDisabled = btn.disabled || false
+
+      return (
+        <DropdownMenu key={btn.id}>
+          <DropdownMenuTrigger asChild>
+            <button
+              disabled={isDisabled || isExporting}
+              className={cn(
+                'p-1.5 rounded-md transition-colors relative',
+                isDisabled || isExporting
+                  ? 'opacity-50 cursor-not-allowed text-muted-foreground'
+                  : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {isExporting ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+              ) : (
+                <Icon size={16} />
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {noteType === 'document' ? (
+              <>
+                <DropdownMenuItem onClick={handleExportPDF} disabled={isExporting}>
+                  导出为 PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportImage} disabled={isExporting}>
+                  导出为图片
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <DropdownMenuItem onClick={handleExportMarkdown} disabled={isExporting}>
+                导出为 Markdown
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
     }
     return renderButton(btn)
   }

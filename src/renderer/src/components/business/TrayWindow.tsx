@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { FileText, Folder, SearchIcon, Settings, Home, ChevronDown, Plus, Save } from 'lucide-react'
 import ScrollArea from '../ui/scroll-area'
 import TrayCodeEditor from './TrayCodeEditor'
@@ -19,6 +19,7 @@ const TrayWindow: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<TabType>('browse')
+  const [isLoading, setIsLoading] = useState(false)
 
   // 创建表单状态
   const [newTitle, setNewTitle] = useState('')
@@ -26,13 +27,26 @@ const TrayWindow: React.FC = () => {
   const [newLanguage, setNewLanguage] = useState('javascript')
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
 
+  // 加载代码片段
+  const loadSnippets = useCallback(async () => {
+    try {
+      const result = await window.api.snippetsGetForTray()
+      setSnippets(result)
+    } catch (error) {
+      console.error('Failed to load snippets:', error)
+    }
+  }, [])
+
   useEffect(() => {
-    // 监听来自主进程的代码片段数据
+    // 初始加载
+    loadSnippets()
+
+    // 监听来自主进程的代码片段数据（保持兼容）
     const unsubscribe = window.api.onTraySnippets((data) => {
       setSnippets(data)
     })
     return () => unsubscribe()
-  }, [])
+  }, [loadSnippets])
 
   // 过滤搜索结果
   const filteredSnippets = useMemo(() => {
@@ -54,26 +68,32 @@ const TrayWindow: React.FC = () => {
     window.api.openMainWindow()
   }
 
-  const handleSaveSnippet = () => {
-    if (!newTitle.trim() || !newCode.trim()) return
+  const handleSaveSnippet = async () => {
+    if (!newTitle.trim() || !newCode.trim() || isLoading) return
 
-    // TODO: 保存到主进程
-    const newSnippet: CodeSnippet = {
-      id: Date.now().toString(),
-      title: newTitle,
-      code: newCode,
-      language: newLanguage,
-      updatedAt: new Date().toLocaleDateString('zh-CN')
+    setIsLoading(true)
+    try {
+      // 保存到数据库
+      await window.api.notesCreate({
+        title: newTitle,
+        content: newCode,
+        type: 'snippet',
+        language: newLanguage
+      })
+
+      // 重新加载列表
+      await loadSnippets()
+
+      // 清空表单并切换到浏览
+      setNewTitle('')
+      setNewCode('')
+      setNewLanguage('javascript')
+      setActiveTab('browse')
+    } catch (error) {
+      console.error('Failed to save snippet:', error)
+    } finally {
+      setIsLoading(false)
     }
-
-    // 临时本地添加（实际应该通过 IPC 保存）
-    setSnippets((prev) => [newSnippet, ...prev])
-
-    // 清空表单并切换到浏览
-    setNewTitle('')
-    setNewCode('')
-    setNewLanguage('javascript')
-    setActiveTab('browse')
   }
 
   const selectedLanguage = DEFAULT_LANGUAGES.find((l) => l.id === newLanguage)
@@ -192,11 +212,11 @@ const TrayWindow: React.FC = () => {
       {/* 保存按钮 */}
       <button
         onClick={handleSaveSnippet}
-        disabled={!newTitle.trim() || !newCode.trim()}
+        disabled={!newTitle.trim() || !newCode.trim() || isLoading}
         className="flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Save size={14} />
-        保存
+        {isLoading ? '保存中...' : '保存'}
       </button>
     </div>
   )

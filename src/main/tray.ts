@@ -2,6 +2,7 @@ import { BrowserWindow, Tray, nativeImage, clipboard, screen, ipcMain, app } fro
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import trayIcon from '../../resources/trayTemplate.png?asset'
+import { getSnippetsForTray } from './database/notes'
 
 // 代码片段数据类型
 export interface CodeSnippet {
@@ -15,59 +16,6 @@ export interface CodeSnippet {
 let tray: Tray | null = null
 let trayWindow: BrowserWindow | null = null
 let mainWindowRef: BrowserWindow | null = null
-
-// 模拟数据，后续替换为实际存储
-let codeSnippets: CodeSnippet[] = [
-  {
-    id: '1',
-    title: '二叉树遍历',
-    code: 'function traverse(node) {\n  if (!node) return;\n  console.log(node.val);\n  traverse(node.left);\n  traverse(node.right);\n}',
-    language: 'JavaScript',
-    updatedAt: '2026/1/10'
-  },
-  {
-    id: '2',
-    title: 'md',
-    code: '# Markdown Title\n\n- Item 1\n- Item 2',
-    language: 'JavaScript',
-    updatedAt: '2026/1/7'
-  },
-  {
-    id: '3',
-    title: 'electron drag',
-    code: '-webkit-app-region: drag;',
-    language: 'electron',
-    updatedAt: '2026/1/7'
-  },
-  {
-    id: '4',
-    title: 'electron debug',
-    code: 'mainWindow.webContents.openDevTools()',
-    language: 'electron',
-    updatedAt: '2026/1/5'
-  },
-  {
-    id: '5',
-    title: 'electron template',
-    code: 'const { app, BrowserWindow } = require("electron")',
-    language: 'electron',
-    updatedAt: '2026/1/5'
-  },
-  {
-    id: '6',
-    title: 'module',
-    code: 'export default function() {}',
-    language: 'JavaScript',
-    updatedAt: '2025/12/16'
-  },
-  {
-    id: '7',
-    title: 'ts',
-    code: 'interface Props {\n  name: string\n}',
-    language: 'JavaScript',
-    updatedAt: '2025/12/16'
-  }
-]
 
 /**
  * 创建托盘弹窗
@@ -98,7 +46,7 @@ function createTrayWindow(): void {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     trayWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#/tray`)
   } else {
-    trayWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'tray' })
+    trayWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/tray' })
   }
 
   // 失去焦点时隐藏
@@ -129,8 +77,13 @@ function showTrayWindow(): void {
   trayWindow.show()
   trayWindow.focus()
 
-  // 发送最新的代码片段数据到托盘窗口
-  trayWindow.webContents.send('tray-snippets', codeSnippets)
+  // 从数据库加载代码片段并发送到托盘窗口
+  try {
+    const snippets = getSnippetsForTray()
+    trayWindow.webContents.send('tray-snippets', snippets)
+  } catch (error) {
+    console.error('Failed to load snippets for tray:', error)
+  }
 }
 
 /**
@@ -154,9 +107,12 @@ function createTray(): void {
 
   // 右键显示主窗口
   tray.on('right-click', () => {
-    if (mainWindowRef) {
+    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
       mainWindowRef.show()
       mainWindowRef.focus()
+    } else {
+      // 主窗口不存在或已被销毁,通过 activate 事件创建新窗口
+      app.emit('activate')
     }
   })
 }
@@ -165,9 +121,9 @@ function createTray(): void {
  * 注册托盘相关的 IPC 事件
  */
 function registerTrayIPC(): void {
-  // IPC: 接收渲染进程发来的代码片段列表更新
-  ipcMain.on('update-snippets', (_, snippets: CodeSnippet[]) => {
-    codeSnippets = snippets
+  // IPC: 接收渲染进程发来的代码片段列表更新（已废弃，保留兼容）
+  ipcMain.on('update-snippets', () => {
+    // 现在数据存储在数据库中，此事件不再需要处理
   })
 
   // IPC: 复制代码片段
@@ -185,9 +141,12 @@ function registerTrayIPC(): void {
   // IPC: 打开主窗口
   ipcMain.on('open-main-window', () => {
     trayWindow?.hide()
-    if (mainWindowRef) {
+    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
       mainWindowRef.show()
       mainWindowRef.focus()
+    } else {
+      // 主窗口不存在或已被销毁,通过 activate 事件创建新窗口
+      app.emit('activate')
     }
   })
 
@@ -195,6 +154,14 @@ function registerTrayIPC(): void {
   ipcMain.on('quit-app', () => {
     app.quit()
   })
+}
+
+/**
+ * 更新主窗口引用
+ * @param mainWindow 新的主窗口引用
+ */
+export function updateMainWindowRef(mainWindow: BrowserWindow): void {
+  mainWindowRef = mainWindow
 }
 
 /**
@@ -209,11 +176,12 @@ export function initTray(mainWindow: BrowserWindow): void {
 }
 
 /**
- * 更新代码片段列表
- * @param snippets 代码片段数组
+ * 更新代码片段列表（已废弃，现在数据存储在数据库中）
+ * @deprecated 使用数据库 API 替代
  */
-export function updateSnippets(snippets: CodeSnippet[]): void {
-  codeSnippets = snippets
+export function updateSnippets(_snippets: CodeSnippet[]): void {
+  // 数据现在存储在 SQLite 数据库中
+  console.warn('updateSnippets is deprecated. Use database API instead.')
 }
 
 /**

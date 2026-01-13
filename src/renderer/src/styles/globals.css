@@ -250,3 +250,14 @@
   --tw-prose-pre-code: var(--foreground);
   --tw-prose-pre-bg: var(--muted);
 }
+
+/* 图片调整大小样式 */
+.ProseMirror img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 禁用默认的选中节点边框，使用自定义的调整大小手柄 */
+.ProseMirror-selectednode {
+  outline: none !important;
+}

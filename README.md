@@ -1,5 +1,9 @@
 # MindDock - AI 增强笔记应用
 
+```bash
+codesign --force --sign - minddock.app
+```
+
 ## 📋 项目任务规划
 
 ### 第一阶段：基础框架 (3-4天)

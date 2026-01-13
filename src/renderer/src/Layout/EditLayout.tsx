@@ -3,31 +3,37 @@ import EditToolHeader from '../components/business/Edit/EditToolHeader'
 import Tiptap from '../components/business/Edit/Tiptap'
 import Codemirror from '../components/business/Edit/Codemirror'
 import OutlineView from '../components/business/Edit/OutlineView'
+import WelcomeView from '../components/business/Edit/WelcomeView'
 import ScrollArea from '@renderer/components/ui/scroll-area'
 import { useEditorContext } from '@renderer/provider/EditorProvider'
+import { useNoteEditor } from '@renderer/hooks/useNoteEditor'
 import { cn } from '@/lib/utils'
 import { ChartNoAxesGantt } from 'lucide-react'
-import {
-  EditorMode,
-  CodeMirrorConfig,
-  DEFAULT_CODEMIRROR_CONFIG,
-  DEFAULT_LANGUAGES
-} from '../components/business/Edit/types'
-import { type TagItem } from '../components/business/Edit/TagInputDropdown'
+import { DEFAULT_LANGUAGES } from '../components/business/Edit/types'
 
 // 窄屏阈值（像素）
 const NARROW_THRESHOLD = 500
 
 const EditLayout = () => {
   const { outlineOpen, outlineItems, editor } = useEditorContext()
-  const [containerWidth, setContainerWidth] = React.useState(0)
+  const {
+    note,
+    title,
+    setTitle,
+    editorMode,
+    setEditorMode,
+    selectedLanguage,
+    setSelectedLanguage,
+    codeContent,
+    setCodeContent,
+    codeMirrorConfig,
+    setCodeMirrorConfig,
+    tags,
+    setTags
+  } = useNoteEditor({ editor })
+
+  const [containerWidth, setContainerWidth] = useState(0)
   const [hoverOutline, setHoverOutline] = useState(false)
-  const [editorMode, setEditorMode] = useState<EditorMode>('word')
-  const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGES[0].id)
-  const [codeMirrorConfig, setCodeMirrorConfig] =
-    useState<CodeMirrorConfig>(DEFAULT_CODEMIRROR_CONFIG)
-  const [codeContent, setCodeContent] = useState('')
-  const [tags, setTags] = useState<TagItem[]>([])
   const containerRef = React.useRef<HTMLDivElement>(null)
 
   // 监听容器宽度
@@ -68,9 +74,15 @@ const EditLayout = () => {
     <OutlineView items={outlineItems} onItemClick={handleOutlineItemClick} className="h-full" />
   )
 
+  if (!note) {
+    return <WelcomeView />
+  }
+
   return (
     <div ref={containerRef} className="h-screen flex flex-col">
       <EditToolHeader
+        title={title}
+        onTitleChange={setTitle}
         mode={editorMode}
         onModeChange={setEditorMode}
         languages={DEFAULT_LANGUAGES}
@@ -80,6 +92,8 @@ const EditLayout = () => {
         onCodeMirrorConfigChange={setCodeMirrorConfig}
         tags={tags}
         onTagsChange={setTags}
+        noteId={note?.id}
+        noteType={note?.type}
       />
       <div className="flex-1 flex overflow-hidden relative">
         {/* 大纲视图 - 宽屏内嵌 */}

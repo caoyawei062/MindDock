@@ -16,7 +16,11 @@ import {
   RemoveFormatting,
   Minus,
   CodeSquare,
-  ImageIcon
+  ImageIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ScrollArea from '@renderer/components/ui/scroll-area'
@@ -147,6 +151,38 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
           tooltip="标题 3"
         >
           <Heading3 size={16} />
+        </ToolbarButton>
+
+        <ToolbarDivider />
+
+        {/* 对齐方式 */}
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
+          isActive={editor.isActive({ textAlign: 'left' })}
+          tooltip="左对齐"
+        >
+          <AlignLeft size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
+          isActive={editor.isActive({ textAlign: 'center' })}
+          tooltip="居中对齐"
+        >
+          <AlignCenter size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
+          isActive={editor.isActive({ textAlign: 'right' })}
+          tooltip="右对齐"
+        >
+          <AlignRight size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+          isActive={editor.isActive({ textAlign: 'justify' })}
+          tooltip="两端对齐"
+        >
+          <AlignJustify size={16} />
         </ToolbarButton>
 
         <ToolbarDivider />

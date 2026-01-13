@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react'
 import { Editor } from '@tiptap/react'
 import { OutlineItem } from '../components/business/Edit/OutlineView'
 
@@ -15,10 +15,6 @@ interface EditorContextType {
   // 大纲数据
   outlineItems: OutlineItem[]
   updateOutlineItems: () => void
-
-  // 标题
-  title: string
-  setTitle: (title: string) => void
 
   // 工具栏
   toolbarOpen: boolean
@@ -43,7 +39,6 @@ export function EditorProvider({ children }: EditorProviderProps) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [outlineItems, setOutlineItems] = useState<OutlineItem[]>([])
-  const [title, setTitle] = useState('未命名文档')
   const [toolbarOpen, setToolbarOpen] = useState(true)
 
   const toggleOutline = useCallback(() => {
@@ -86,19 +81,28 @@ export function EditorProvider({ children }: EditorProviderProps) {
     setOutlineItems(items)
   }, [editor])
 
-  const value: EditorContextType = {
-    editor,
-    setEditor,
-    outlineOpen,
-    setOutlineOpen,
-    toggleOutline,
-    outlineItems,
-    updateOutlineItems,
-    title,
-    setTitle,
-    toolbarOpen,
-    toggleToolbar
-  }
+  const value: EditorContextType = useMemo(
+    () => ({
+      editor,
+      setEditor,
+      outlineOpen,
+      setOutlineOpen,
+      toggleOutline,
+      outlineItems,
+      updateOutlineItems,
+      toolbarOpen,
+      toggleToolbar
+    }),
+    [
+      editor,
+      outlineOpen,
+      outlineItems,
+      updateOutlineItems,
+      toolbarOpen,
+      toggleOutline,
+      toggleToolbar
+    ]
+  )
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
 }

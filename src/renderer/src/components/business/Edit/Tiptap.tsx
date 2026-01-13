@@ -4,7 +4,7 @@ import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import Image from '@tiptap/extension-image'
+import TextAlign from '@tiptap/extension-text-align'
 import { common, createLowlight } from 'lowlight'
 import {
   Bold,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useEditorContext } from '@renderer/provider/EditorProvider'
 import EditorToolbar from './EditorToolbar'
+import { ResizableImage } from './ResizableImage'
 
 // 创建 lowlight 实例，使用常用语言
 const lowlight = createLowlight(common)
@@ -67,7 +68,10 @@ const Tiptap: React.FC = () => {
         lowlight,
         defaultLanguage: 'plaintext'
       }),
-      Image.configure({
+      TextAlign.configure({
+        types: ['heading', 'paragraph']
+      }),
+      ResizableImage.configure({
         inline: false,
         allowBase64: true,
         HTMLAttributes: {

@@ -3,7 +3,9 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { CHANGETHEME } from '../constants'
-import { initTray } from './tray'
+import { initTray, updateMainWindowRef } from './tray'
+import { initDatabase, closeDatabase } from './database'
+import { registerDatabaseIPC } from './database/ipc'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -14,7 +16,7 @@ function createWindow(): void {
     height: 670,
     show: false,
     minWidth: 810,
-    alwaysOnTop: true,
+    // alwaysOnTop: true,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -27,6 +29,15 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
+    // 窗口准备好后更新托盘的主窗口引用
+    if (process.platform === 'darwin' && mainWindow) {
+      updateMainWindowRef(mainWindow)
+    }
+  })
+
+  // 窗口关闭时清除引用
+  mainWindow.on('closed', () => {
+    mainWindow = null
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -50,6 +61,10 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
+  // 初始化数据库
+  initDatabase()
+  registerDatabaseIPC()
+
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
@@ -69,6 +84,16 @@ app.whenReady().then(() => {
     })
   })
 
+  // 打开文件路径
+  ipcMain.handle('open-path', async (_, filePath: string) => {
+    try {
+      await shell.showItemInFolder(filePath)
+    } catch (error) {
+      console.error('Failed to open path:', error)
+      throw error
+    }
+  })
+
   createWindow()
 
   // 创建托盘（仅 macOS）
@@ -79,7 +104,12 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (mainWindow === null) {
+      createWindow()
+    } else if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show()
+      mainWindow.focus()
+    }
   })
 })
 
@@ -90,6 +120,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// 应用退出时关闭数据库
+app.on('before-quit', () => {
+  closeDatabase()
 })
 
 // In this file you can include the rest of your app's specific main process

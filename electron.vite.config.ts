@@ -5,9 +5,24 @@ import svgr from 'vite-plugin-svgr'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  main: {},
-  preload: {},
-  renderer: {
+  main: {
+    build: {
+      rollupOptions: {
+        external: ['better-sqlite3']
+      }
+    }
+  },
+  preload: {
+    build:{
+      rollupOptions:{
+        external: ['better-sqlite3']
+      }
+    }
+  },
+  renderer: {  
+    optimizeDeps: {
+      exclude: ['better-sqlite3']
+    },
     resolve: {
       alias: {
         '@renderer': resolve(__dirname, 'src/renderer/src'),
