@@ -32,6 +32,9 @@ mac:
   sign: null
   gatekeeperAssess: false
   notarize: false
+  entitlements: null
+  entitlementsInherit: null
+  provisioningProfile: null
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
@@ -49,5 +52,8 @@ publish:
   url: https://example.com/auto-updates
   owner: null
   repo: null
+  releaseType: release
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
+# 禁用压缩以加快构建速度（适合调试）
+# compression: normal
