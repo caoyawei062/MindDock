@@ -17,6 +17,10 @@ win:
     - x64
   target:
     - target: nsis
+  signingHashAlgorithms:
+    - sha256
+  sign: null
+  verifySignFlags: []
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -27,6 +31,9 @@ nsis:
 mac:
   hardenedRuntime: false
   identity: null
+  sign: null
+  gatekeeperAssess: false
+  notarize: false
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
@@ -42,5 +49,7 @@ npmRebuild: false
 publish:
   provider: generic
   url: https://example.com/auto-updates
+  owner: null
+  repo: null
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
