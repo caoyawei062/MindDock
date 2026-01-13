@@ -36,13 +36,13 @@ jobs:
         run: pnpm install
 
       - name: Build Windows
-        run: pnpm run build && electron-builder --win --publish never
+        run: pnpm run build && pnpm exec electron-builder --win --publish never
         if: matrix.os == 'windows-latest'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Build macOS
-        run: pnpm run build && electron-builder --mac --publish never
+        run: pnpm run build && pnpm exec electron-builder --mac --publish never
         if: matrix.os == 'macos-latest'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
