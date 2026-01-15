@@ -1,4 +1,14 @@
-import { ChartNoAxesGantt, Copy, Tag, Trash2, Save, PenTool, Download, LucideIcon, Bot } from 'lucide-react'
+import {
+  ChartNoAxesGantt,
+  Copy,
+  Tag,
+  Trash2,
+  Save,
+  PenTool,
+  Download,
+  LucideIcon,
+  Bot
+} from 'lucide-react'
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -7,6 +17,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { useEditorContext } from '@renderer/provider/EditorProvider'
 import { useExport } from '@renderer/provider/ExportProvider'
 import { cn } from '@/lib/utils'
@@ -20,6 +39,7 @@ import {
 import LanguageSelector from './LanguageSelector'
 import CodeMirrorSettings from './CodeMirrorSettings'
 import TagInputDropdown, { type TagItem } from './TagInputDropdown'
+import { useList } from '@renderer/provider/ListProvider'
 
 export type { EditorMode, LanguageConfig, CodeMirrorConfig } from './types'
 
@@ -55,6 +75,7 @@ interface EditToolHeaderProps {
   tags?: TagItem[]
   onTagsChange?: (tags: TagItem[]) => void
   noteId?: string
+  noteContent?: string // 添加笔记内容用于 AI 生成标签
   onExport?: () => Promise<void>
   noteType?: 'document' | 'snippet'
 }
@@ -72,12 +93,24 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   tags = [],
   onTagsChange,
   noteId,
+  noteContent = '',
   noteType = 'document'
 }) => {
-  const { outlineOpen, toggleOutline, toolbarOpen, toggleToolbar, aiPanelOpen, toggleAiPanel, editor, setAIInputText } = useEditorContext()
+  const {
+    outlineOpen,
+    toggleOutline,
+    toolbarOpen,
+    toggleToolbar,
+    aiPanelOpen,
+    toggleAiPanel,
+    editor,
+    setAIInputText
+  } = useEditorContext()
   const { exportToPDF, exportToImage, exportToMarkdown } = useExport()
+  const { deleteNote } = useList()
   const [isExporting, setIsExporting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editValue, setEditValue] = useState(title)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -134,6 +167,15 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
       setIsExporting(false)
     }
   }, [noteId, isExporting, exportToMarkdown])
+
+  // 处理删除笔记
+  const handleDelete = useCallback(async () => {
+    if (!noteId) return
+    const success = await deleteNote(noteId)
+    if (success) {
+      setDeleteDialogOpen(false)
+    }
+  }, [noteId, deleteNote])
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -223,7 +265,8 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
             id: 'delete',
             icon: Trash2,
             tooltip: '删除',
-            variant: 'destructive'
+            variant: 'destructive',
+            onClick: () => setDeleteDialogOpen(true)
           },
           {
             id: 'save',
@@ -234,7 +277,19 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
         ]
       }
     ],
-    [outlineOpen, toggleOutline, toolbarOpen, toggleToolbar, aiPanelOpen, handleAIButtonClick, handleExportPDF, handleExportImage, handleExportMarkdown, noteId, isExporting]
+    [
+      outlineOpen,
+      toggleOutline,
+      toolbarOpen,
+      toggleToolbar,
+      aiPanelOpen,
+      handleAIButtonClick,
+      handleExportPDF,
+      handleExportImage,
+      handleExportMarkdown,
+      noteId,
+      isExporting
+    ]
   )
 
   // 根据模式过滤按钮
@@ -296,23 +351,24 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   const renderTagButton = (btn: ToolButtonConfig) => {
     const Icon = btn.icon
     const tooltipText = typeof btn.tooltip === 'function' ? btn.tooltip() : btn.tooltip
-    const isActive = tags.length > 0
+    // const isActive = tags.length > 0
 
     return (
-      <TagInputDropdown key={btn.id} tags={tags} onTagsChange={onTagsChange}>
+      <TagInputDropdown
+        key={btn.id}
+        tags={tags}
+        onTagsChange={onTagsChange}
+        noteId={noteId}
+        noteContent={noteContent}
+      >
         <button
           className={cn(
             'p-1.5 rounded-md transition-colors relative',
-            isActive
-              ? 'bg-accent text-foreground'
-              : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+            'hover:bg-accent text-muted-foreground hover:text-foreground'
           )}
           title={tooltipText}
         >
           <Icon size={16} />
-          {isActive && (
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
-          )}
         </button>
       </TagInputDropdown>
     )
@@ -369,49 +425,70 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   }
 
   return (
-    <div className="relative flex items-center justify-between px-2 py-1.5 border-b border-border/50 drag">
-      <div className="flex items-center gap-1">
-        {leftButtons.map(renderButtonByType)}
-        {mode === 'code' && (
-          <>
-            <LanguageSelector
-              languages={languages}
-              selectedLanguage={selectedLanguage}
-              onLanguageChange={onLanguageChange}
-            />
-            <CodeMirrorSettings
-              config={codeMirrorConfig}
-              onConfigChange={onCodeMirrorConfigChange}
-            />
-          </>
-        )}
-      </div>
+    <>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>移到废纸篓</DialogTitle>
+            <DialogDescription>
+              该笔记将被移到废纸篓,可以在废纸篓中恢复或彻底删除。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              取消
+            </Button>
+            <Button variant="default" onClick={handleDelete}>
+              移到废纸篓
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* 可编辑标题 */}
-      <div className="absolute left-1/2 -translate-x-1/2 no-drag">
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={handleTitleBlur}
-            onKeyDown={handleKeyDown}
-            className="bg-accent/30 text-center text-sm font-medium text-foreground outline-none ring-1 ring-primary/50 rounded px-4 py-1.5 min-w-[200px] max-w-[400px] selection:bg-primary/20"
-          />
-        ) : (
-          <button
-            onClick={handleTitleClick}
-            title={title}
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50 truncate max-w-[300px]"
-          >
-            {title}
-          </button>
-        )}
-      </div>
+      <div className="relative flex items-center justify-between px-2 py-1.5 border-b border-border/50 drag">
+        <div className="flex items-center gap-1">
+          {leftButtons.map(renderButtonByType)}
+          {mode === 'code' && (
+            <>
+              <LanguageSelector
+                languages={languages}
+                selectedLanguage={selectedLanguage}
+                onLanguageChange={onLanguageChange}
+              />
+              <CodeMirrorSettings
+                config={codeMirrorConfig}
+                onConfigChange={onCodeMirrorConfigChange}
+              />
+            </>
+          )}
+        </div>
 
-      <div className="flex items-center gap-1">{rightButtons.map(renderButton)}</div>
-    </div>
+        {/* 可编辑标题 */}
+        <div className="absolute left-1/2 -translate-x-1/2 no-drag">
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={handleTitleBlur}
+              onKeyDown={handleKeyDown}
+              className="bg-accent/30 text-center text-sm font-medium text-foreground outline-none ring-1 ring-primary/50 rounded px-4 py-1.5 min-w-[200px] max-w-[400px] selection:bg-primary/20"
+            />
+          ) : (
+            <button
+              onClick={handleTitleClick}
+              title={title}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50 truncate max-w-[300px]"
+            >
+              {title}
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1">{rightButtons.map(renderButton)}</div>
+      </div>
+    </>
   )
 }
 

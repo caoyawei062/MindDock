@@ -69,12 +69,20 @@ const items: MenuItem[] = [
 ]
 
 export function AppSidebar() {
-  const { filterType, setFilterType } = useList()
+  const { filterType, setFilterType, notes, recentViews, clearRecentViews, selectedNote, setSelectedNote } = useList()
   const { exports, deleteExport } = useExport()
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const handleItemClick = (item: MenuItem) => {
     setFilterType(item.filterType)
+  }
+
+  // 点击最近查看项
+  const handleRecentClick = (id: string) => {
+    const note = notes.find(n => n.id === id)
+    if (note) {
+      setSelectedNote(note)
+    }
   }
 
   return (
@@ -109,6 +117,47 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+
+          {/* 最近查看 */}
+          {recentViews.length > 0 && (
+            <SidebarGroup className="border-t border-border/50 pt-2 mt-2">
+              <SidebarGroupLabel className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Clock size={12} className="text-muted-foreground" />
+                  最近查看
+                </span>
+                <button
+                  onClick={clearRecentViews}
+                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
+                >
+                  清空
+                </button>
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <ScrollArea className="max-h-48">
+                  <SidebarMenu className="space-y-0.5">
+                    {recentViews.map((item) => (
+                      <SidebarMenuItem key={item.id}>
+                        <SidebarMenuButton
+                          isActive={selectedNote?.id === item.id}
+                          onClick={() => handleRecentClick(item.id)}
+                          className="cursor-pointer h-8"
+                        >
+                          {item.type === 'snippet' ? (
+                            <CodeXml size={14} className="shrink-0 text-orange-500" />
+                          ) : (
+                            <FileText size={14} className="shrink-0 text-blue-500" />
+                          )}
+                          <span className="truncate text-sm">{item.title}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </ScrollArea>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+
           {/* 暂时隐藏文件夹功能
           <SidebarGroup>
             <SidebarGroupContent className="px-0">

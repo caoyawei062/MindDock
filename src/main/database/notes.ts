@@ -217,7 +217,7 @@ export function getTrashedNotes(): Note[] {
 }
 
 /**
- * 搜索笔记（全文搜索）
+ * 搜索笔记（全文搜索 + 标签搜索）
  */
 export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[] {
   const db = getDatabase()
@@ -226,41 +226,81 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
     return getAllNotes(type)
   }
 
-  // 使用 FTS5 搜索
-  let sql = `
+  // 先尝试标签搜索
+  const tagSearchSql = `
+    SELECT DISTINCT n.* FROM notes n
+    JOIN note_tags nt ON n.id = nt.note_id
+    JOIN tags t ON nt.tag_id = t.id
+    WHERE n.is_trashed = 0 AND t.name LIKE ?
+    ${type ? 'AND n.type = ?' : ''}
+    ORDER BY n.updated_at DESC
+  `
+
+  const tagSearchParams: (string | number)[] = [`%${query}%`]
+  if (type) {
+    tagSearchParams.push(type)
+  }
+
+  const tagResults = db.prepare(tagSearchSql).all(...tagSearchParams) as Note[]
+
+  // 使用 FTS5 搜索标题和内容
+  let ftsSql = `
     SELECT n.* FROM notes n
     JOIN notes_fts fts ON n.rowid = fts.rowid
     WHERE notes_fts MATCH ? AND n.is_trashed = 0
+    ${type ? 'AND n.type = ?' : ''}
+    ORDER BY rank
   `
-  const params: (string | number)[] = [`${query}*`]
-
+  const ftsParams: (string | number)[] = [`${query}*`]
   if (type) {
-    sql += ' AND n.type = ?'
-    params.push(type)
+    ftsParams.push(type)
   }
 
-  sql += ' ORDER BY rank'
-
+  let textResults: Note[] = []
   try {
-    return db.prepare(sql).all(...params) as Note[]
+    textResults = db.prepare(ftsSql).all(...ftsParams) as Note[]
   } catch {
     // FTS 搜索失败，回退到 LIKE 搜索
     let fallbackSql = `
-      SELECT * FROM notes 
+      SELECT * FROM notes
       WHERE is_trashed = 0 AND (title LIKE ? OR content LIKE ?)
+      ${type ? 'AND type = ?' : ''}
+      ORDER BY updated_at DESC
     `
     const likeTerm = `%${query}%`
     const fallbackParams: (string | number)[] = [likeTerm, likeTerm]
-
     if (type) {
-      fallbackSql += ' AND type = ?'
       fallbackParams.push(type)
     }
 
-    fallbackSql += ' ORDER BY updated_at DESC'
-
-    return db.prepare(fallbackSql).all(...fallbackParams) as Note[]
+    textResults = db.prepare(fallbackSql).all(...fallbackParams) as Note[]
   }
+
+  // 合并标签搜索结果和文本搜索结果，去重
+  const allResults = new Map<string, Note>()
+
+  // 先添加标签匹配的结果（优先级更高）
+  tagResults.forEach(note => {
+    allResults.set(note.id, note)
+  })
+
+  // 再添加文本搜索的结果
+  textResults.forEach(note => {
+    allResults.set(note.id, note)
+  })
+
+  // 转换为数组并排序：标签匹配的在前，然后按更新时间排序
+  const results = Array.from(allResults.values()).sort((a, b) => {
+    const aInTag = tagResults.some(t => t.id === a.id)
+    const bInTag = tagResults.some(t => t.id === b.id)
+
+    if (aInTag && !bInTag) return -1
+    if (!aInTag && bInTag) return 1
+
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  })
+
+  return results
 }
 
 /**

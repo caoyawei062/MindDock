@@ -2,9 +2,15 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { AIMessage } from '@renderer/types/ai'
-import { Send, Sparkles, Loader2 } from 'lucide-react'
+import { Send, Sparkles, Loader2, ChevronDown } from 'lucide-react'
 import { useEditorContext } from '@renderer/provider/EditorProvider'
 import ReactMarkdown from 'react-markdown'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@renderer/components/ui/dropdown-menu'
 
 interface AISidebarProps {
   className?: string
@@ -147,23 +153,6 @@ export function AISidebar({ className }: AISidebarProps) {
         </Button>
       </div>
 
-      {/* 模型选择 */}
-      {models.length > 0 && (
-        <div className="p-3 border-b">
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full px-3 py-2 text-sm border rounded-md bg-background"
-          >
-            {models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && !response && (
@@ -178,11 +167,8 @@ export function AISidebar({ className }: AISidebarProps) {
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] rounded-lg p-3 text-sm ${
-                message.role === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-background border'
-              }`}
+              className={`max-w-[85%] rounded-lg p-3 text-sm ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background border'
+                }`}
             >
               {message.role === 'assistant' ? (
                 <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -227,6 +213,32 @@ export function AISidebar({ className }: AISidebarProps) {
 
       {/* 输入框 */}
       <div className="p-3 border-t">
+        {/* 模型选择 - 使用 DropdownMenu 组件 */}
+        {models.length > 0 && (
+          <div className="mb-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full justify-between">
+                  <span className="truncate">
+                    {models.find((m) => m.id === selectedModel)?.name || '选择模型'}
+                  </span>
+                  <ChevronDown className="w-4 h-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-full min-w-2xs" side="top">
+                {models.map((model) => (
+                  <DropdownMenuItem
+                    key={model.id}
+                    onClick={() => setSelectedModel(model.id)}
+                    className={model.id === selectedModel ? 'bg-accent' : ''}
+                  >
+                    {model.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
         <div className="flex gap-2">
           <Textarea
             placeholder="输入消息... (Enter 发送)"
@@ -248,7 +260,11 @@ export function AISidebar({ className }: AISidebarProps) {
             className="flex-1 min-h-[60px] max-h-[120px] resize-none text-sm"
             disabled={isLoading}
           />
-          <Button onClick={handleSend} disabled={!input.trim() || !selectedModel || isLoading} size="icon">
+          <Button
+            onClick={handleSend}
+            disabled={!input.trim() || !selectedModel || isLoading}
+            size="icon"
+          >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (

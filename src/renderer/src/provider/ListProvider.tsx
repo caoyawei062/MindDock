@@ -3,10 +3,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 
 // 标签类型定义
 export interface Tag {
-  id: string
-  name: string
-  color: string
-  created_at: string
+    id: string
+    name: string
+    color: string
+    created_at: string
 }
 
 // 笔记类型定义
@@ -31,24 +31,42 @@ export interface Note {
 // 侧边栏筛选类型
 export type FilterType = 'all' | 'document' | 'snippet' | 'trash'
 
+// 最近查看记录
+export interface RecentViewItem {
+    id: string
+    title: string
+    type: 'document' | 'snippet'
+}
+
 interface ListContextType {
     // 当前筛选类型
     filterType: FilterType
     setFilterType: (type: FilterType) => void
 
+    // 搜索查询
+    searchQuery: string
+    setSearchQuery: (query: string) => void
+
     // 笔记列表
     notes: Note[]
+    filteredNotes: Note[]  // 过滤后的笔记列表
     isLoading: boolean
 
     // 当前选中的笔记
     selectedNote: Note | null
     setSelectedNote: (note: Note | null) => void
 
+    // 最近查看
+    recentViews: RecentViewItem[]
+    clearRecentViews: () => void
+
     // 操作方法
     loadNotes: () => Promise<void>
     createNote: (params: { title?: string; content?: string; type?: 'document' | 'snippet'; language?: string }) => Promise<Note | null>
     // 更新笔记
     updateNote: (id: string, params: { title?: string; content?: string; language?: string; is_pinned?: number }) => Promise<Note | null>
+    // 更新笔记标签（同步到列表）
+    updateNoteTags: (id: string, tags: Tag[]) => void
     deleteNote: (id: string) => Promise<boolean>
     restoreNote: (id: string) => Promise<boolean>
 }
@@ -65,14 +83,68 @@ export const useList = () => {
 
 export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [filterType, setFilterType] = useState<FilterType>('all')
+    const [searchQuery, setSearchQuery] = useState('')
     const [notes, setNotes] = useState<Note[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [selectedNote, setSelectedNoteInternal] = useState<Note | null>(null)
+    const [recentViews, setRecentViews] = useState<RecentViewItem[]>(() => {
+        // 从 localStorage 加载最近查看记录
+        try {
+            const saved = localStorage.getItem('minddock-recent-views')
+            return saved ? JSON.parse(saved) : []
+        } catch {
+            return []
+        }
+    })
     // const { selectedFolder } = useFolder() // 暂时禁用文件夹功能
+
+    // 去除 HTML 标签的辅助函数
+    const stripHtml = (html: string) => {
+        return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+    }
+
+    // 过滤后的笔记列表
+    const filteredNotes = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return notes
+        }
+        const query = searchQuery.toLowerCase()
+        return notes.filter(note => {
+            // 标题匹配
+            if (note.title?.toLowerCase().includes(query)) return true
+            // 内容匹配（去除 HTML 标签后）
+            const plainContent = stripHtml(note.content || '')
+            if (plainContent.toLowerCase().includes(query)) return true
+            // 标签匹配
+            if (note.tags?.some(tag => tag.name.toLowerCase().includes(query))) return true
+            return false
+        })
+    }, [notes, searchQuery])
 
     // 稳定的 setSelectedNote 引用，避免触发不必要的重渲染
     const setSelectedNote = useCallback((note: Note | null) => {
         setSelectedNoteInternal(note)
+        // 更新最近查看记录（废纸篓中的笔记不添加）
+        if (note && filterType !== 'trash') {
+            setRecentViews(prev => {
+                // 移除已存在的记录
+                const filtered = prev.filter(item => item.id !== note.id)
+                // 添加到最前面，最多保留 10 条
+                const newList: RecentViewItem[] = [
+                    { id: note.id, title: note.title || '无标题', type: note.type },
+                    ...filtered
+                ].slice(0, 10)
+                // 保存到 localStorage
+                localStorage.setItem('minddock-recent-views', JSON.stringify(newList))
+                return newList
+            })
+        }
+    }, [filterType])
+
+    // 清空最近查看
+    const clearRecentViews = useCallback(() => {
+        setRecentViews([])
+        localStorage.removeItem('minddock-recent-views')
     }, [])
 
     // 加载笔记列表
@@ -139,11 +211,15 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             const updated = await window.api.notesUpdate(id, params)
             if (updated) {
+                // 为更新后的笔记加载标签
+                const tags = await window.api.tagsGetByNoteId(id)
+                const updatedWithTags = { ...updated, tags }
+
                 // 更新列表中的数据（不重新加载整个列表，优化性能）
-                setNotes(prev => prev.map(n => n.id === id ? updated : n))
+                setNotes(prev => prev.map(n => n.id === id ? updatedWithTags : n))
                 // 如果是当前选中的笔记，也更新选中状态
                 if (selectedNote?.id === id) {
-                    setSelectedNote(updated)
+                    setSelectedNote(updatedWithTags)
                 }
             }
             return updated
@@ -152,6 +228,15 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return null
         }
     }, [selectedNote])
+
+    // 更新笔记标签（同步到列表）
+    const updateNoteTags = useCallback((id: string, tags: Tag[]) => {
+        setNotes(prev => prev.map(n => n.id === id ? { ...n, tags } : n))
+        // 如果是当前选中的笔记，也更新选中状态
+        if (selectedNote?.id === id) {
+            setSelectedNote({ ...selectedNote, tags })
+        }
+    }, [selectedNote, setSelectedNote])
 
     // 删除笔记（移到回收站或永久删除）
     const deleteNote = useCallback(async (id: string) => {
@@ -197,15 +282,21 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const stableValue = useMemo(() => ({
         filterType,
         setFilterType,
+        searchQuery,
+        setSearchQuery,
         notes,
+        filteredNotes,
         isLoading,
         setSelectedNote,
+        recentViews,
+        clearRecentViews,
         loadNotes,
         createNote,
         updateNote,
+        updateNoteTags,
         deleteNote,
         restoreNote
-    }), [filterType, notes, isLoading, setSelectedNote, loadNotes, createNote, updateNote, deleteNote, restoreNote])
+    }), [filterType, searchQuery, notes, filteredNotes, isLoading, setSelectedNote, recentViews, clearRecentViews, loadNotes, createNote, updateNote, updateNoteTags, deleteNote, restoreNote])
 
     const value = useMemo(() => ({
         ...stableValue,

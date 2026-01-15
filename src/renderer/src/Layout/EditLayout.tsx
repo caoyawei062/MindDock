@@ -35,6 +35,8 @@ const EditLayout = () => {
 
   const [containerWidth, setContainerWidth] = useState(0)
   const [hoverOutline, setHoverOutline] = useState(false)
+  const [aiSidebarWidth, setAiSidebarWidth] = useState(320)
+  const [isResizing, setIsResizing] = useState(false)
   const containerRef = React.useRef<HTMLDivElement>(null)
 
   // 监听容器宽度
@@ -50,6 +52,33 @@ const EditLayout = () => {
     observer.observe(containerRef.current)
     return () => observer.disconnect()
   }, [])
+
+  // 处理 AI 侧边栏拖拽
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+
+    const startX = e.clientX
+    const startWidth = aiSidebarWidth
+
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = startX - e.clientX
+      const newWidth = Math.max(280, Math.min(800, startWidth + deltaX))
+      setAiSidebarWidth(newWidth)
+    }
+
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
 
   const isNarrow = containerWidth < NARROW_THRESHOLD && containerWidth > 0
 
@@ -94,6 +123,7 @@ const EditLayout = () => {
         tags={tags}
         onTagsChange={setTags}
         noteId={note?.id}
+        noteContent={editorMode === 'word' ? editor?.getHTML() || '' : codeContent}
         noteType={note?.type}
       />
       <div className="flex-1 flex overflow-hidden relative">
@@ -162,9 +192,24 @@ const EditLayout = () => {
 
         {/* AI 侧边栏 */}
         {aiPanelOpen && (
-          <div className="w-80 border-l border-border/50 shrink-0">
-            <AISidebar className="h-full" />
-          </div>
+          <>
+            {/* 拖拽手柄 */}
+            <div
+              className={cn(
+                'w-1 bg-border/50 hover:bg-primary/50 cursor-col-resize transition-colors relative',
+                isResizing && 'bg-primary/50'
+              )}
+              onMouseDown={handleMouseDown}
+            >
+              {/* 拖拽指示器 */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-8 bg-border/50 rounded-full" />
+            </div>
+
+            {/* 侧边栏 */}
+            <div className="shrink-0 overflow-hidden" style={{ width: `${aiSidebarWidth}px` }}>
+              <AISidebar className="h-full" />
+            </div>
+          </>
         )}
       </div>
     </div>

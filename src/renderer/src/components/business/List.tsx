@@ -4,7 +4,7 @@ import { useList } from '@renderer/provider/ListProvider'
 import { FileText, Loader2, Inbox } from 'lucide-react'
 
 const List: React.FC = () => {
-  const { notes, isLoading, filterType, selectedNote, setSelectedNote } = useList()
+  const { notes, filteredNotes, searchQuery, isLoading, filterType, selectedNote, setSelectedNote } = useList()
 
   const handleClick = () => {
     setSelectedNote(null)
@@ -46,7 +46,18 @@ const List: React.FC = () => {
   }
 
   // 空状态
-  if (notes.length === 0) {
+  if (filteredNotes.length === 0) {
+    // 搜索无结果
+    if (searchQuery && notes.length > 0) {
+      return (
+        <div className="h-full flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 text-muted-foreground">
+            <Inbox className="size-10 opacity-50" />
+            <span className="text-sm">未找到匹配 "{searchQuery}" 的结果</span>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -68,12 +79,13 @@ const List: React.FC = () => {
         handleClick
       }}
     >
-      {notes.map((note) => (
+      {filteredNotes.map((note) => (
         <ListItem
           key={note.id}
           note={note}
           isSelected={selectedNote?.id === note.id}
           onSelect={handleSelectNote}
+          filterType={filterType}
         />
       ))}
     </div>

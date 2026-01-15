@@ -1,17 +1,17 @@
 import React from 'react'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group'
-import { Keyboard, PenLine, SearchIcon } from 'lucide-react'
+import { Keyboard, PenLine, SearchIcon, X } from 'lucide-react'
 import { Button } from '../ui/button'
 import { useList } from '@renderer/provider/ListProvider'
 
 const Search: React.FC = () => {
-  const { createNote, filterType, setFilterType } = useList()
+  const { createNote, filterType, setFilterType, searchQuery, setSearchQuery, filteredNotes } = useList()
 
   const handleCreateDocument = async () => {
     if (filterType !== 'all' && filterType !== 'document') {
       setFilterType('document')
     }
-    await createNote({ type: 'document', title: '' }) // 可以留空让后端或hooks处理默认标题
+    await createNote({ type: 'document', title: '' })
   }
 
   const handleCreateSnippet = async () => {
@@ -21,15 +21,41 @@ const Search: React.FC = () => {
     await createNote({ type: 'snippet', title: '', language: 'javascript' })
   }
 
+  const clearSearch = () => {
+    setSearchQuery('')
+  }
+
   return (
     <div className="p-3 border-b dark:border-border-dark drag">
       <InputGroup>
-        <InputGroupInput placeholder="快速定位内容" />
+        <InputGroupInput
+          placeholder="搜索标题、内容或标签..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
         <InputGroupAddon>
-          <SearchIcon />
+          {searchQuery ? (
+            <button
+              onClick={clearSearch}
+              className="hover:bg-accent rounded-full p-0.5 transition-colors"
+              title="清除搜索"
+            >
+              <X size={14} />
+            </button>
+          ) : (
+            <SearchIcon />
+          )}
         </InputGroupAddon>
       </InputGroup>
-      <div className="flex justify-around mt-2 ">
+
+      {/* 搜索结果提示 */}
+      {searchQuery && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          找到 {filteredNotes.length} 个结果
+        </div>
+      )}
+
+      <div className="flex justify-around mt-2">
         <div className="w-[calc(50%-8px)]">
           <Button className="w-full" onClick={handleCreateDocument}>
             <PenLine />

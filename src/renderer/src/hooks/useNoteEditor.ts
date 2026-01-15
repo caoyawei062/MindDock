@@ -43,7 +43,7 @@ interface UseNoteEditorReturn {
 }
 
 export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorReturn {
-  const { selectedNote, updateNote } = useList()
+  const { selectedNote, updateNote, updateNoteTags } = useList()
 
   // 本地状态（乐观更新）
   const [title, setTitleInternal] = useState('')
@@ -52,7 +52,7 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
   const [codeContent, setCodeContentInternal] = useState('')
   const [codeMirrorConfig, setCodeMirrorConfig] =
     useState<CodeMirrorConfig>(DEFAULT_CODEMIRROR_CONFIG)
-  const [tags, setTags] = useState<TagItem[]>([])
+  const [tags, setTagsInternal] = useState<TagItem[]>([])
   const [isDirty, setIsDirty] = useState(false)
 
   // 用于追踪当前笔记，避免保存到错误的笔记
@@ -79,6 +79,38 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
     [updateNote]
   )
 
+  // 设置标签（同时更新本地状态和列表）
+  const setTags = useCallback((newTags: TagItem[]) => {
+    setTagsInternal(newTags)
+    // 同步到列表
+    if (currentNoteIdRef.current) {
+      // 转换为 Tag 类型（添加 created_at 字段）
+      const tagsForList = newTags.map(t => ({
+        id: t.id,
+        name: t.name,
+        color: t.color || '#6366f1',
+        created_at: new Date().toISOString()
+      }))
+      updateNoteTags(currentNoteIdRef.current, tagsForList)
+    }
+  }, [updateNoteTags])
+
+  // 加载笔记标签
+  const loadNoteTags = async (noteId: string) => {
+    try {
+      const noteTags = await window.api.tagsGetByNoteId(noteId)
+      const tagItems: TagItem[] = noteTags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        color: tag.color
+      }))
+      setTagsInternal(tagItems)
+    } catch (error) {
+      console.error('Failed to load note tags:', error)
+      setTagsInternal([])
+    }
+  }
+
   // 当选中笔记变化时，重置本地状态
   useEffect(() => {
     if (selectedNote && selectedNote.id !== currentNoteIdRef.current) {
@@ -98,6 +130,9 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
         setCodeContentInternal(selectedNote.content || '')
       }
 
+      // 加载笔记的标签
+      loadNoteTags(selectedNote.id)
+
       setIsDirty(false)
 
       // 延迟重置初始化标记，确保状态更新完成
@@ -109,6 +144,7 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
       setTitleInternal('未命名文档')
       setEditorMode('word')
       setCodeContentInternal('')
+      setTagsInternal([])
       setIsDirty(false)
     }
   }, [selectedNote?.id])
