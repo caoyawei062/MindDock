@@ -12,7 +12,6 @@ import { aiConfigManager } from './config'
 export class AIService {
   private static instance: AIService
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
   private constructor() {}
 
   static getInstance(): AIService {
@@ -25,7 +24,6 @@ export class AIService {
   /**
    * 创建模型实例
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private createModel(config: AIModelConfig): any {
     const { provider, apiKey, baseURL, model } = config
 
@@ -173,8 +171,8 @@ export class AIService {
       return {
         content: result.text,
         usage: {
-          promptTokens: result.usage?.promptTokens ?? 0,
-          completionTokens: result.usage?.completionTokens ?? 0,
+          promptTokens: result.usage?.inputTokens ?? 0,
+          completionTokens: result.usage?.outputTokens ?? 0,
           totalTokens: result.usage?.totalTokens ?? 0
         }
       }
