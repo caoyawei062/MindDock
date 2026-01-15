@@ -57,7 +57,7 @@ export function AISidebar({ className }: AISidebarProps) {
     }
   }
 
-  const handleSend = async () => {
+  const handleSend = async (): Promise<void> => {
     if (!input.trim() || !selectedModel || isLoading) return
 
     const userMessage: AIMessage = {
@@ -99,7 +99,7 @@ export function AISidebar({ className }: AISidebarProps) {
         setIsLoading(false)
       })
 
-      const unsubscribeError = window.api.aiOnStreamError(sessionId, (error: string) => {
+      window.api.aiOnStreamError(sessionId, (error: string) => {
         setIsLoading(false)
         setResponse(`Error: ${error}`)
       })
@@ -109,11 +109,8 @@ export function AISidebar({ className }: AISidebarProps) {
       await window.api.aiStreamCompletion(selectedModel, currentMessages, {}, sessionId)
 
       // 清理监听器
-      return () => {
-        unsubscribeChunk?.()
-        unsubscribeComplete?.()
-        unsubscribeError?.()
-      }
+      unsubscribeChunk?.()
+      unsubscribeComplete?.()
     } catch (error) {
       console.error('Failed to send message:', error)
       setIsLoading(false)

@@ -44,7 +44,7 @@ export function ThemeProvider({
 
       // 监听系统主题变化
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      const handleChange = (e: MediaQueryListEvent) => {
+      const handleChange = (e: MediaQueryListEvent): void => {
         const newTheme = e.matches ? 'dark' : 'light'
         root.classList.remove('light', 'dark')
         root.classList.add(newTheme)
@@ -56,6 +56,7 @@ export function ThemeProvider({
     }
 
     root.classList.add(theme)
+    return undefined
   }, [theme])
 
   // 监听来自主进程的主题变化（跨窗口同步）

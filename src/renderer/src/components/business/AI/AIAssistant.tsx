@@ -1,8 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
-import { useAIStream } from '@renderer/hooks/useAI'
-import { AIMessage, AICompletionOptions } from '@renderer/types/ai'
+import { AIMessage } from '@renderer/types/ai'
 import {
   Select,
   SelectContent,
@@ -10,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
-import { Loader2, Send, Sparkles } from 'lucide-react'
+import { Send, Sparkles } from 'lucide-react'
 
 interface AIAssistantProps {
   className?: string
@@ -45,7 +44,7 @@ export function AIAssistant({ className, onInsert }: AIAssistantProps) {
     }
   }
 
-  const handleSend = async () => {
+  const handleSend = async (): Promise<void> => {
     if (!input.trim() || !selectedModel) return
 
     const userMessage: AIMessage = {
@@ -58,11 +57,11 @@ export function AIAssistant({ className, onInsert }: AIAssistantProps) {
     setInput('')
     setResponse('')
 
-    const onChunk = (chunk: string) => {
+    const onChunk = (chunk: string): void => {
       setResponse((prev) => prev + chunk)
     }
 
-    const onComplete = () => {
+    const onComplete = (): void => {
       setMessages((prev) => [
         ...prev,
         userMessage,
@@ -70,14 +69,12 @@ export function AIAssistant({ className, onInsert }: AIAssistantProps) {
       ])
     }
 
-    // 使用 useAIStream
-    // 这里简化处理，实际需要使用 hook
     try {
       const sessionId = `stream-${Date.now()}`
 
       const unsubscribeChunk = window.api.aiOnStreamChunk(sessionId, onChunk)
       const unsubscribeComplete = window.api.aiOnStreamComplete(sessionId, onComplete)
-      const unsubscribeError = window.api.aiOnStreamError(sessionId, (error) => {
+      window.api.aiOnStreamError(sessionId, (error) => {
         console.error('Stream error:', error)
         setResponse(`Error: ${error}`)
       })
@@ -89,10 +86,9 @@ export function AIAssistant({ className, onInsert }: AIAssistantProps) {
         sessionId
       )
 
-      return () => {
-        unsubscribeChunk()
-        unsubscribeComplete()
-      }
+      // Cleanup listeners
+      unsubscribeChunk()
+      unsubscribeComplete()
     } catch (error) {
       console.error('Failed to send message:', error)
     }
@@ -144,11 +140,10 @@ export function AIAssistant({ className, onInsert }: AIAssistantProps) {
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                message.role === 'user'
+              className={`max-w-[80%] rounded-lg p-3 ${message.role === 'user'
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-800'
-              }`}
+                }`}
             >
               <p className="whitespace-pre-wrap">{message.content}</p>
             </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAIConfig } from '@renderer/hooks/useAI'
 import { AIModelConfig, AIProvider } from '@renderer/types/ai'
 import {
@@ -17,15 +17,16 @@ interface AISettingsProps {
   onOpenChange: (open: boolean) => void
 }
 
-const PROVIDER_NAMES: Record<AIProvider, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  google: 'Google',
-  deepseek: 'DeepSeek'
-}
+// Provider names for reference
+// const PROVIDER_NAMES: Record<AIProvider, string> = {
+//   openai: 'OpenAI',
+//   anthropic: 'Anthropic',
+//   google: 'Google',
+//   deepseek: 'DeepSeek'
+// }
 
 export function AISettings({ open, onOpenChange }: AISettingsProps) {
-  const { models, loadAllModels, updateModel, toggleModel, testModel, loading, error } =
+  const { models, loadAllModels, updateModel, toggleModel, testModel, error } =
     useAIConfig()
   const [testingModel, setTestingModel] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; error?: string }>>({})

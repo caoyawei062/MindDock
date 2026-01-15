@@ -19,7 +19,7 @@ export function useAIStream(
 ): UseAIStreamResult {
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const sessionIdRef = useRef<string>()
+  const sessionIdRef = useRef<string>('')
   const cleanupRef = useRef<(() => void)[]>([])
 
   const stopStream = useCallback(() => {
@@ -34,7 +34,7 @@ export function useAIStream(
   }, [])
 
   const startStream = useCallback(
-    async (modelId: string, messages: AIMessage[], options: AICompletionOptions = {}) => {
+    async (modelId: string, messages: AIMessage[], options: Partial<AICompletionOptions> = {}) => {
       try {
         setIsStreaming(true)
         setError(null)
