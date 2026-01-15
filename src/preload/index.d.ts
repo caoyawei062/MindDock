@@ -24,6 +24,15 @@ interface Note {
   created_at: string
   updated_at: string
   trashed_at: string | null
+  tags?: Tag[] // 可选的标签数组
+}
+
+// 标签类型
+interface Tag {
+  id: string
+  name: string
+  color: string
+  created_at: string
 }
 
 // 托盘代码片段
@@ -93,7 +102,8 @@ interface API {
   notesTogglePin: (id: string) => Promise<Note | null>
   snippetsGetForTray: () => Promise<TraySnippet[]>
 
-  // 文件夹 API
+  // 文件夹 API (暂时禁用)
+  /*
   foldersGetAll: () => Promise<Folder[]>
   foldersGetTree: () => Promise<Folder[]>
   foldersGetById: (id: string) => Promise<Folder | null>
@@ -117,6 +127,7 @@ interface API {
   ) => Promise<Folder | null>
   foldersDelete: (id: string) => Promise<boolean>
   foldersToggleExpanded: (id: string) => Promise<Folder | null>
+  */
 
   // 导出 API
   exportsGetAll: (limit?: number) => Promise<ExportRecord[]>
@@ -125,6 +136,32 @@ interface API {
   exportMarkdown: (noteId: string) => Promise<ExportRecord | null>
   exportsDelete: (id: string) => Promise<boolean>
   openPath: (path: string) => Promise<void>
+
+  // 标签 API
+  tagsGetAll: () => Promise<Tag[]>
+  tagsGetById: (id: string) => Promise<Tag | null>
+  tagsCreate: (params: { name: string; color?: string }) => Promise<Tag>
+  tagsUpdate: (id: string, params: { name?: string; color?: string }) => Promise<Tag | null>
+  tagsDelete: (id: string) => Promise<boolean>
+  tagsGetByNoteId: (noteId: string) => Promise<Tag[]>
+  tagsAddToNote: (noteId: string, tagId: string) => Promise<void>
+  tagsRemoveFromNote: (noteId: string, tagId: string) => Promise<boolean>
+  tagsSetNoteTags: (noteId: string, tagIds: string[]) => Promise<void>
+  tagsGetNoteIds: (tagId: string) => Promise<string[]>
+
+  // AI API
+  aiGetAllModels: () => Promise<any[]>
+  aiGetEnabledModels: () => Promise<any[]>
+  aiGetModelById: (id: string) => Promise<any>
+  aiUpdateModel: (id: string, updates: any) => Promise<any>
+  aiToggleModel: (id: string, enabled: boolean) => Promise<any>
+  aiGetModelsByProvider: (provider: string) => Promise<any[]>
+  aiStreamCompletion: (modelId: string, messages: any[], options: any, sessionId: string) => Promise<any>
+  aiOnStreamChunk: (sessionId: string, callback: (chunk: string) => void) => () => void
+  aiOnStreamComplete: (sessionId: string, callback: () => void) => () => void
+  aiOnStreamError: (sessionId: string, callback: (error: string) => void) => () => void
+  aiGenerateCompletion: (modelId: string, messages: any[], options: any) => Promise<any>
+  aiTestModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
 }
 
 declare global {

@@ -6,6 +6,7 @@ import { CHANGETHEME } from '../constants'
 import { initTray, updateMainWindowRef } from './tray'
 import { initDatabase, closeDatabase } from './database'
 import { registerDatabaseIPC } from './database/ipc'
+import { registerAIIPC } from './ai/ipc'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -65,6 +66,9 @@ app.whenReady().then(() => {
   initDatabase()
   registerDatabaseIPC()
 
+  // 初始化 AI IPC
+  registerAIIPC()
+
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
@@ -82,6 +86,24 @@ app.whenReady().then(() => {
     BrowserWindow.getAllWindows().forEach((win) => {
       win.webContents.send('theme-changed', theme)
     })
+  })
+
+  // 监听系统主题变化
+  nativeTheme.on('updated', () => {
+    // 当主题设置为 'system' 时,系统主题变化会触发此事件
+    const currentThemeSource = nativeTheme.themeSource
+    console.log('System theme updated, current theme source:', currentThemeSource)
+
+    if (currentThemeSource === 'system') {
+      // 获取当前实际的主题（light 或 dark）
+      const actualTheme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+      console.log('Actual theme based on system:', actualTheme)
+
+      // 广播实际主题变化到所有窗口
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('theme-changed', actualTheme)
+      })
+    }
   })
 
   // 打开文件路径

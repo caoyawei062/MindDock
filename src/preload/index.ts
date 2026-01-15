@@ -93,8 +93,8 @@ const api = {
     return ipcRenderer.invoke('db:snippets:getForTray')
   },
 
-  // ============ 文件夹 API ============
-
+  // ============ 文件夹 API (暂时禁用) ============
+  /*
   // 获取所有文件夹
   foldersGetAll: () => {
     return ipcRenderer.invoke('db:folders:getAll')
@@ -136,6 +136,7 @@ const api = {
   foldersToggleExpanded: (id: string) => {
     return ipcRenderer.invoke('db:folders:toggleExpanded', id)
   },
+  */
 
   // ============ 导出 API ============
 
@@ -162,6 +163,106 @@ const api = {
   // 打开文件路径
   openPath: (path: string) => {
     return ipcRenderer.invoke('open-path', path)
+  },
+
+  // ============ 标签 API ============
+
+  // 获取所有标签
+  tagsGetAll: () => {
+    return ipcRenderer.invoke('db:tags:getAll')
+  },
+  // 根据 ID 获取标签
+  tagsGetById: (id: string) => {
+    return ipcRenderer.invoke('db:tags:getById', id)
+  },
+  // 创建标签
+  tagsCreate: (params: { name: string; color?: string }) => {
+    return ipcRenderer.invoke('db:tags:create', params)
+  },
+  // 更新标签
+  tagsUpdate: (id: string, params: { name?: string; color?: string }) => {
+    return ipcRenderer.invoke('db:tags:update', id, params)
+  },
+  // 删除标签
+  tagsDelete: (id: string) => {
+    return ipcRenderer.invoke('db:tags:delete', id)
+  },
+  // 获取笔记的所有标签
+  tagsGetByNoteId: (noteId: string) => {
+    return ipcRenderer.invoke('db:tags:getByNoteId', noteId)
+  },
+  // 为笔记添加标签
+  tagsAddToNote: (noteId: string, tagId: string) => {
+    return ipcRenderer.invoke('db:tags:addToNote', noteId, tagId)
+  },
+  // 从笔记移除标签
+  tagsRemoveFromNote: (noteId: string, tagId: string) => {
+    return ipcRenderer.invoke('db:tags:removeFromNote', noteId, tagId)
+  },
+  // 设置笔记的标签(替换所有标签)
+  tagsSetNoteTags: (noteId: string, tagIds: string[]) => {
+    return ipcRenderer.invoke('db:tags:setNoteTags', noteId, tagIds)
+  },
+  // 获取使用该标签的所有笔记 ID
+  tagsGetNoteIds: (tagId: string) => {
+    return ipcRenderer.invoke('db:tags:getNoteIds', tagId)
+  },
+
+  // ============ AI API ============
+
+  // 获取所有模型
+  aiGetAllModels: () => {
+    return ipcRenderer.invoke('ai:models:getAll')
+  },
+  // 获取启用的模型
+  aiGetEnabledModels: () => {
+    return ipcRenderer.invoke('ai:models:getEnabled')
+  },
+  // 根据 ID 获取模型
+  aiGetModelById: (id: string) => {
+    return ipcRenderer.invoke('ai:models:getById', id)
+  },
+  // 更新模型配置
+  aiUpdateModel: (id: string, updates: any) => {
+    return ipcRenderer.invoke('ai:models:update', id, updates)
+  },
+  // 启用/禁用模型
+  aiToggleModel: (id: string, enabled: boolean) => {
+    return ipcRenderer.invoke('ai:models:toggle', id, enabled)
+  },
+  // 根据提供商获取模型
+  aiGetModelsByProvider: (provider: string) => {
+    return ipcRenderer.invoke('ai:models:getByProvider', provider)
+  },
+  // 流式生成文本
+  aiStreamCompletion: (modelId: string, messages: any[], options: any, sessionId: string) => {
+    return ipcRenderer.invoke('ai:completion:stream', modelId, messages, options, sessionId)
+  },
+  // 监听流式数据
+  aiOnStreamChunk: (sessionId: string, callback: (chunk: string) => void) => {
+    const listener = (_: any, chunk: string) => callback(chunk)
+    ipcRenderer.on(`ai:stream:chunk:${sessionId}`, listener)
+    return () => ipcRenderer.removeListener(`ai:stream:chunk:${sessionId}`, listener)
+  },
+  // 监听流式完成
+  aiOnStreamComplete: (sessionId: string, callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.once(`ai:stream:complete:${sessionId}`, listener)
+    return () => ipcRenderer.removeListener(`ai:stream:complete:${sessionId}`, listener)
+  },
+  // 监听流式错误
+  aiOnStreamError: (sessionId: string, callback: (error: string) => void) => {
+    const listener = (_: any, error: string) => callback(error)
+    ipcRenderer.once(`ai:stream:error:${sessionId}`, listener)
+    return () => ipcRenderer.removeListener(`ai:stream:error:${sessionId}`, listener)
+  },
+  // 一次性生成文本
+  aiGenerateCompletion: (modelId: string, messages: any[], options: any) => {
+    return ipcRenderer.invoke('ai:completion:generate', modelId, messages, options)
+  },
+  // 测试模型连接
+  aiTestModel: (modelId: string) => {
+    return ipcRenderer.invoke('ai:model:test', modelId)
   }
 }
 

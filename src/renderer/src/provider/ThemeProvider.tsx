@@ -41,7 +41,18 @@ export function ThemeProvider({
         : 'light'
 
       root.classList.add(systemTheme)
-      return
+
+      // 监听系统主题变化
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      const handleChange = (e: MediaQueryListEvent) => {
+        const newTheme = e.matches ? 'dark' : 'light'
+        root.classList.remove('light', 'dark')
+        root.classList.add(newTheme)
+      }
+
+      // 使用 addEventListener (现代浏览器标准)
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
     }
 
     root.classList.add(theme)

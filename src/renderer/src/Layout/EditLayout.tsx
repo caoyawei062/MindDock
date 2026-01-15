@@ -10,12 +10,13 @@ import { useNoteEditor } from '@renderer/hooks/useNoteEditor'
 import { cn } from '@/lib/utils'
 import { ChartNoAxesGantt } from 'lucide-react'
 import { DEFAULT_LANGUAGES } from '../components/business/Edit/types'
+import { AISidebar } from '@renderer/components/business/AI'
 
 // 窄屏阈值（像素）
 const NARROW_THRESHOLD = 500
 
 const EditLayout = () => {
-  const { outlineOpen, outlineItems, editor } = useEditorContext()
+  const { outlineOpen, outlineItems, editor, aiPanelOpen } = useEditorContext()
   const {
     note,
     title,
@@ -158,6 +159,13 @@ const EditLayout = () => {
             />
           )}
         </ScrollArea>
+
+        {/* AI 侧边栏 */}
+        {aiPanelOpen && (
+          <div className="w-80 border-l border-border/50 shrink-0">
+            <AISidebar className="h-full" />
+          </div>
+        )}
       </div>
     </div>
   )

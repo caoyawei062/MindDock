@@ -50,6 +50,26 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect }) 
         </span>
         {note.is_pinned === 1 && <Pin size={12} className="text-primary shrink-0" />}
       </div>
+
+      {/* 标签显示区域 */}
+      {note.tags && note.tags.length > 0 && (
+        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+          {note.tags.map((tag) => (
+            <div
+              key={tag.id}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+              style={{
+                backgroundColor: `${tag.color}20`,
+                color: tag.color
+              }}
+            >
+              <Tag size={10} />
+              <span className="select-text">{tag.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         {note.type === 'snippet' && note.language ? (
           <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-md bg-primary/10">

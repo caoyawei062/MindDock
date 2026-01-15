@@ -19,6 +19,14 @@ interface EditorContextType {
   // 工具栏
   toolbarOpen: boolean
   toggleToolbar: () => void
+
+  // AI 面板
+  aiPanelOpen: boolean
+  setAiPanelOpen: (open: boolean) => void
+  toggleAiPanel: () => void
+  setAIInputText: (text: string) => void
+  getAIInputText: () => string
+  clearAIInputText: () => void
 }
 
 const EditorContext = createContext<EditorContextType | null>(null)
@@ -40,6 +48,8 @@ export function EditorProvider({ children }: EditorProviderProps) {
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [outlineItems, setOutlineItems] = useState<OutlineItem[]>([])
   const [toolbarOpen, setToolbarOpen] = useState(true)
+  const [aiPanelOpen, setAiPanelOpen] = useState(false)
+  const [aiInputText, setAIInputTextState] = useState('')
 
   const toggleOutline = useCallback(() => {
     setOutlineOpen((prev) => !prev)
@@ -47,6 +57,22 @@ export function EditorProvider({ children }: EditorProviderProps) {
 
   const toggleToolbar = useCallback(() => {
     setToolbarOpen((prev) => !prev)
+  }, [])
+
+  const toggleAiPanel = useCallback(() => {
+    setAiPanelOpen((prev) => !prev)
+  }, [])
+
+  const setAIInputText = useCallback((text: string) => {
+    setAIInputTextState(text)
+  }, [])
+
+  const getAIInputText = useCallback(() => {
+    return aiInputText
+  }, [aiInputText])
+
+  const clearAIInputText = useCallback(() => {
+    setAIInputTextState('')
   }, [])
 
   // 从编辑器内容提取大纲
@@ -91,7 +117,13 @@ export function EditorProvider({ children }: EditorProviderProps) {
       outlineItems,
       updateOutlineItems,
       toolbarOpen,
-      toggleToolbar
+      toggleToolbar,
+      aiPanelOpen,
+      setAiPanelOpen,
+      toggleAiPanel,
+      setAIInputText,
+      getAIInputText,
+      clearAIInputText
     }),
     [
       editor,
@@ -100,7 +132,12 @@ export function EditorProvider({ children }: EditorProviderProps) {
       updateOutlineItems,
       toolbarOpen,
       toggleOutline,
-      toggleToolbar
+      toggleToolbar,
+      aiPanelOpen,
+      toggleAiPanel,
+      setAIInputText,
+      getAIInputText,
+      clearAIInputText
     ]
   )
 

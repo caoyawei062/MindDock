@@ -1,7 +1,6 @@
 import React from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { AppSidebar } from '@/components/business/SideBar'
-import FloatBall from '@renderer/components/business/FloatBall'
 import ListLayout from './ListLayout'
 import EditLayout from './EditLayout'
 import { EditorProvider } from '@renderer/provider/EditorProvider'
@@ -22,7 +21,6 @@ const MainLayout: React.FC = () => {
             </EditorProvider>
           </ResizablePanel>
         </ResizablePanelGroup>
-        <FloatBall />
       </main>
     </>
   )

@@ -1,4 +1,4 @@
-import { ChartNoAxesGantt, Copy, Tag, Trash2, Save, PenTool, Download, LucideIcon } from 'lucide-react'
+import { ChartNoAxesGantt, Copy, Tag, Trash2, Save, PenTool, Download, LucideIcon, Bot } from 'lucide-react'
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -74,12 +74,24 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   noteId,
   noteType = 'document'
 }) => {
-  const { outlineOpen, toggleOutline, toolbarOpen, toggleToolbar } = useEditorContext()
+  const { outlineOpen, toggleOutline, toolbarOpen, toggleToolbar, aiPanelOpen, toggleAiPanel, editor, setAIInputText } = useEditorContext()
   const { exportToPDF, exportToImage, exportToMarkdown } = useExport()
   const [isExporting, setIsExporting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(title)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // 处理 AI 按钮点击
+  const handleAIButtonClick = useCallback(() => {
+    if (editor) {
+      const { from, to } = editor.state.selection
+      if (from !== to) {
+        const selectedText = editor.state.doc.textBetween(from, to)
+        setAIInputText(selectedText)
+      }
+    }
+    toggleAiPanel()
+  }, [editor, setAIInputText, toggleAiPanel])
 
   // 处理导出为 PDF
   const handleExportPDF = useCallback(async () => {
@@ -169,18 +181,19 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
             tooltip: '复制内容'
           },
           {
-            id: 'export',
-            icon: Download,
-            tooltip: '导出',
-            disabled: !noteId || isExporting
-          },
-          {
             id: 'outline',
             icon: ChartNoAxesGantt,
             tooltip: () => (outlineOpen ? '收起大纲' : '大纲视图'),
             onClick: toggleOutline,
             isActive: () => outlineOpen,
             modes: ['word']
+          },
+          {
+            id: 'ai',
+            icon: Bot,
+            tooltip: () => (aiPanelOpen ? '收起AI助手' : 'AI助手'),
+            onClick: handleAIButtonClick,
+            isActive: () => aiPanelOpen
           },
           {
             id: 'tag',
@@ -201,6 +214,12 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
         position: 'right',
         buttons: [
           {
+            id: 'export',
+            icon: Download,
+            tooltip: '导出',
+            disabled: !noteId || isExporting
+          },
+          {
             id: 'delete',
             icon: Trash2,
             tooltip: '删除',
@@ -215,7 +234,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
         ]
       }
     ],
-    [outlineOpen, toggleOutline, toolbarOpen, toggleToolbar, handleExportPDF, handleExportImage, handleExportMarkdown, noteId, isExporting]
+    [outlineOpen, toggleOutline, toolbarOpen, toggleToolbar, aiPanelOpen, handleAIButtonClick, handleExportPDF, handleExportImage, handleExportMarkdown, noteId, isExporting]
   )
 
   // 根据模式过滤按钮

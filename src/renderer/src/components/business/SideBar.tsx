@@ -7,6 +7,7 @@ import {
   FileText,
   Clock,
   X,
+  Settings,
   LucideIcon
 } from 'lucide-react'
 import ScrollArea from '@/components/ui/scroll-area'
@@ -29,10 +30,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { useList, FilterType } from '@renderer/provider/ListProvider'
-import { FolderSection } from './FolderTree'
+// import { FolderSection } from './FolderTree' // 暂时隐藏文件夹功能
 import { useExport } from '@renderer/provider/ExportProvider'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
+import { useState } from 'react'
+import { AppSettings } from './Settings/AppSettings'
 
 // 菜单项类型
 interface MenuItem {
@@ -68,6 +71,7 @@ const items: MenuItem[] = [
 export function AppSidebar() {
   const { filterType, setFilterType } = useList()
   const { exports, deleteExport } = useExport()
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const handleItemClick = (item: MenuItem) => {
     setFilterType(item.filterType)
@@ -105,13 +109,23 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          {/* 暂时隐藏文件夹功能
           <SidebarGroup>
             <SidebarGroupContent className="px-0">
               <FolderSection />
             </SidebarGroupContent>
           </SidebarGroup>
+          */}
         </SidebarContent>
         <SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={() => setSettingsOpen(true)} className="cursor-pointer">
+                <Settings />
+                <span className="group-data-[collapsible=icon]:hidden">设置</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
@@ -182,6 +196,7 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
+      <AppSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   )
 }

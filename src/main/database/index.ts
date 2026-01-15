@@ -93,7 +93,8 @@ function runMigrations(database: Database.Database): void {
 
   const migrations = [
     { name: '001_initial', sql: migration001Initial },
-    { name: '002_add_fts', sql: migration002AddFts }
+    { name: '002_add_fts', sql: migration002AddFts },
+    { name: '003_add_ai_configs', sql: migration003AddAiConfigs }
   ]
 
   const executedMigrations = (
@@ -210,11 +211,29 @@ CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
-  INSERT INTO notes_fts(notes_fts, rowid, title, content) 
+  INSERT INTO notes_fts(notes_fts, rowid, title, content)
   VALUES('delete', OLD.rowid, OLD.title, OLD.content);
-  INSERT INTO notes_fts(rowid, title, content) 
+  INSERT INTO notes_fts(rowid, title, content)
   VALUES (NEW.rowid, NEW.title, NEW.content);
 END;
+`
+
+const migration003AddAiConfigs = `
+-- AI 配置表
+CREATE TABLE IF NOT EXISTS ai_configs (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  provider      TEXT NOT NULL,
+  model         TEXT NOT NULL,
+  enabled       INTEGER NOT NULL DEFAULT 0,
+  api_key       TEXT,
+  base_url      TEXT,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_configs_provider ON ai_configs(provider);
+CREATE INDEX IF NOT EXISTS idx_ai_configs_enabled ON ai_configs(enabled);
 `
 
 export default {

@@ -15,23 +15,45 @@ import {
   CreateNoteParams,
   UpdateNoteParams
 } from './notes'
-import {
-  getAllFolders,
-  getFolderTree,
-  getFolderById,
-  createFolder,
-  updateFolder,
-  deleteFolder,
-  toggleFolderExpanded,
-  CreateFolderParams,
-  UpdateFolderParams
-} from './folders'
+// import {  // 暂时禁用文件夹功能
+//   getAllFolders,
+//   getFolderTree,
+//   getFolderById,
+//   createFolder,
+//   updateFolder,
+//   deleteFolder,
+//   toggleFolderExpanded,
+//   CreateFolderParams,
+//   UpdateFolderParams
+// } from './folders'
 import {
   getAllExports,
   createExportRecord,
   deleteExport,
   cleanOldExports
 } from './exports'
+import {
+  getAllTags,
+  getTagById,
+  createTag,
+  updateTag,
+  deleteTag,
+  getTagsByNoteId,
+  addTagToNote,
+  removeTagFromNote,
+  setNoteTags,
+  getNoteIdsByTagId
+} from './tags'
+import {
+  getAllAIConfigs,
+  getEnabledAIConfigs,
+  getAIConfigsByProvider,
+  getAIConfigById,
+  upsertAIConfig,
+  updateAIConfig,
+  toggleAIConfig,
+  deleteAIConfig
+} from './ai-configs'
 import { contentToHTML } from '../export/pdf'
 
 /**
@@ -93,8 +115,8 @@ export function registerDatabaseIPC(): void {
     return getSnippetsForTray()
   })
 
-  // ========== 文件夹操作 ==========
-
+  // ========== 文件夹操作 (暂时禁用) ==========
+  /*
   // 获取所有文件夹
   ipcMain.handle('db:folders:getAll', () => {
     return getAllFolders()
@@ -129,6 +151,7 @@ export function registerDatabaseIPC(): void {
   ipcMain.handle('db:folders:toggleExpanded', (_, id: string) => {
     return toggleFolderExpanded(id)
   })
+  */
 
   // ========== 导出操作 ==========
 
@@ -332,6 +355,100 @@ export function registerDatabaseIPC(): void {
   // 删除导出记录
   ipcMain.handle('db:exports:delete', (_, id: string) => {
     return deleteExport(id)
+  })
+
+  // ========== 标签操作 ==========
+
+  // 获取所有标签
+  ipcMain.handle('db:tags:getAll', () => {
+    return getAllTags()
+  })
+
+  // 根据 ID 获取标签
+  ipcMain.handle('db:tags:getById', (_, id: string) => {
+    return getTagById(id)
+  })
+
+  // 创建标签
+  ipcMain.handle('db:tags:create', (_, params: { name: string; color?: string }) => {
+    return createTag(params)
+  })
+
+  // 更新标签
+  ipcMain.handle('db:tags:update', (_, id: string, params: { name?: string; color?: string }) => {
+    return updateTag(id, params)
+  })
+
+  // 删除标签
+  ipcMain.handle('db:tags:delete', (_, id: string) => {
+    return deleteTag(id)
+  })
+
+  // 获取笔记的所有标签
+  ipcMain.handle('db:tags:getByNoteId', (_, noteId: string) => {
+    return getTagsByNoteId(noteId)
+  })
+
+  // 为笔记添加标签
+  ipcMain.handle('db:tags:addToNote', (_, noteId: string, tagId: string) => {
+    return addTagToNote(noteId, tagId)
+  })
+
+  // 从笔记移除标签
+  ipcMain.handle('db:tags:removeFromNote', (_, noteId: string, tagId: string) => {
+    return removeTagFromNote(noteId, tagId)
+  })
+
+  // 设置笔记的标签(替换所有标签)
+  ipcMain.handle('db:tags:setNoteTags', (_, noteId: string, tagIds: string[]) => {
+    return setNoteTags(noteId, tagIds)
+  })
+
+  // 获取使用该标签的所有笔记 ID
+  ipcMain.handle('db:tags:getNoteIds', (_, tagId: string) => {
+    return getNoteIdsByTagId(tagId)
+  })
+
+  // ========== AI 配置操作 ==========
+
+  // 获取所有 AI 配置
+  ipcMain.handle('db:ai:getAll', () => {
+    return getAllAIConfigs()
+  })
+
+  // 获取启用的 AI 配置
+  ipcMain.handle('db:ai:getEnabled', () => {
+    return getEnabledAIConfigs()
+  })
+
+  // 根据提供商获取 AI 配置
+  ipcMain.handle('db:ai:getByProvider', (_, provider: string) => {
+    return getAIConfigsByProvider(provider as any)
+  })
+
+  // 根据 ID 获取 AI 配置
+  ipcMain.handle('db:ai:getById', (_, id: string) => {
+    return getAIConfigById(id)
+  })
+
+  // 创建或更新 AI 配置
+  ipcMain.handle('db:ai:upsert', (_, config: any) => {
+    return upsertAIConfig(config)
+  })
+
+  // 更新 AI 配置的部分字段
+  ipcMain.handle('db:ai:update', (_, id: string, updates: any) => {
+    return updateAIConfig(id, updates)
+  })
+
+  // 启用/禁用 AI 模型
+  ipcMain.handle('db:ai:toggle', (_, id: string, enabled: boolean) => {
+    return toggleAIConfig(id, enabled)
+  })
+
+  // 删除 AI 配置
+  ipcMain.handle('db:ai:delete', (_, id: string) => {
+    return deleteAIConfig(id)
   })
 
   console.log('Database IPC handlers registered.')

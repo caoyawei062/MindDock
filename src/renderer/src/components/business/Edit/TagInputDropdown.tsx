@@ -18,39 +18,42 @@ interface TagInputDropdownProps {
   onTagsChange?: (tags: TagItem[]) => void
   children: React.ReactNode
   className?: string
+  noteId?: string // 添加 noteId 参数
 }
-
-// 预设颜色
-const TAG_COLORS = [
-  'bg-red-500/20 text-red-600 dark:text-red-400',
-  'bg-orange-500/20 text-orange-600 dark:text-orange-400',
-  'bg-amber-500/20 text-amber-600 dark:text-amber-400',
-  'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
-  'bg-lime-500/20 text-lime-600 dark:text-lime-400',
-  'bg-green-500/20 text-green-600 dark:text-green-400',
-  'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
-  'bg-teal-500/20 text-teal-600 dark:text-teal-400',
-  'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400',
-  'bg-sky-500/20 text-sky-600 dark:text-sky-400',
-  'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-  'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400',
-  'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-  'bg-purple-500/20 text-purple-600 dark:text-purple-400',
-  'bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400',
-  'bg-pink-500/20 text-pink-600 dark:text-pink-400'
-]
-
-const getRandomColor = () => TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]
 
 const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
   tags = [],
   onTagsChange,
   children,
-  className
+  className,
+  noteId
 }) => {
   const [inputValue, setInputValue] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [allTags, setAllTags] = useState<TagItem[]>([])
+
+  // 加载所有标签
+  useEffect(() => {
+    if (isOpen) {
+      loadAllTags()
+    }
+  }, [isOpen])
+
+  const loadAllTags = async () => {
+    try {
+      const tags = await window.api.tagsGetAll()
+      // 转换为 TagItem 格式
+      const tagItems: TagItem[] = tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        color: tag.color
+      }))
+      setAllTags(tagItems)
+    } catch (error) {
+      console.error('Failed to load tags:', error)
+    }
+  }
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -61,7 +64,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
     }
   }, [isOpen])
 
-  const handleAddTag = () => {
+  const handleAddTag = async () => {
     const trimmedValue = inputValue.trim()
     if (!trimmedValue) return
 
@@ -71,17 +74,54 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
       return
     }
 
-    const newTag: TagItem = {
-      id: `tag-${Date.now()}`,
-      name: trimmedValue,
-      color: getRandomColor()
-    }
+    try {
+      // 创建新标签
+      const newTag = await window.api.tagsCreate({
+        name: trimmedValue,
+        color: '#6366f1' // 使用默认颜色
+      })
 
-    onTagsChange?.([...tags, newTag])
-    setInputValue('')
+      const tagItem: TagItem = {
+        id: newTag.id,
+        name: newTag.name,
+        color: newTag.color
+      }
+
+      // 如果有 noteId,添加到笔记
+      if (noteId) {
+        await window.api.tagsAddToNote(noteId, newTag.id)
+      }
+
+      onTagsChange?.([...tags, tagItem])
+      setInputValue('')
+      await loadAllTags() // 重新加载标签列表
+    } catch (error) {
+      console.error('Failed to create tag:', error)
+    }
   }
 
-  const handleRemoveTag = (tagId: string) => {
+  const handleToggleTag = async (tag: TagItem) => {
+    const isSelected = tags.some((t) => t.id === tag.id)
+
+    if (isSelected) {
+      // 移除标签
+      if (noteId) {
+        await window.api.tagsRemoveFromNote(noteId, tag.id)
+      }
+      onTagsChange?.(tags.filter((t) => t.id !== tag.id))
+    } else {
+      // 添加标签
+      if (noteId) {
+        await window.api.tagsAddToNote(noteId, tag.id)
+      }
+      onTagsChange?.([...tags, tag])
+    }
+  }
+
+  const handleRemoveTag = async (tagId: string) => {
+    if (noteId) {
+      await window.api.tagsRemoveFromNote(noteId, tagId)
+    }
     onTagsChange?.(tags.filter((tag) => tag.id !== tagId))
   }
 
@@ -96,14 +136,21 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
     }
   }
 
+  // 过滤标签
+  const filteredTags = allTags.filter(
+    (tag) =>
+      tag.name.toLowerCase().includes(inputValue.toLowerCase()) &&
+      !tags.some((t) => t.id === tag.id)
+  )
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className={cn('w-64 p-2', className)}>
+      <DropdownMenuContent align="start" className={cn('w-72 p-2', className)}>
         <div className="space-y-2">
           {/* 已添加的标签 */}
           {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 pb-2 border-b">
               {tags.map((tag) => (
                 <span
                   key={tag.id}
@@ -111,6 +158,10 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
                     'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
                     tag.color || 'bg-accent text-accent-foreground'
                   )}
+                  style={{
+                    backgroundColor: tag.color ? `${tag.color}20` : undefined,
+                    color: tag.color || undefined
+                  }}
                 >
                   {tag.name}
                   <button
@@ -148,6 +199,33 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
               <Plus size={14} />
             </button>
           </div>
+
+          {/* 可选择的已有标签 */}
+          {filteredTags.length > 0 && (
+            <>
+              <div className="border-t pt-2">
+                <p className="text-[10px] text-muted-foreground mb-1.5">选择已有标签</p>
+                <div className="max-h-32 overflow-y-auto space-y-0.5">
+                  {filteredTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => handleToggleTag(tag)}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-2 py-1 rounded text-xs hover:bg-accent/50 transition-colors text-left'
+                      )}
+                    >
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      <span className="flex-1">{tag.name}</span>
+                      <Plus size={12} className="text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           {/* 提示文本 */}
           <p className="text-[10px] text-muted-foreground">按 Enter 添加标签，Backspace 删除</p>
