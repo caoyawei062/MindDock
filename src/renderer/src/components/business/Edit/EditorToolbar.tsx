@@ -44,6 +44,7 @@ const ToolbarButton = ({
   <Tooltip>
     <TooltipTrigger asChild>
       <button
+        onMouseDown={(e) => e.preventDefault()}
         onClick={onClick}
         className={cn(
           'p-1.5 rounded hover:bg-accent transition-colors shrink-0',
