@@ -4,7 +4,15 @@ import { useList } from '@renderer/provider/ListProvider'
 import { FileText, Loader2, Inbox } from 'lucide-react'
 
 const List: React.FC = () => {
-  const { notes, filteredNotes, searchQuery, isLoading, filterType, selectedNote, setSelectedNote } = useList()
+  const {
+    notes,
+    filteredNotes,
+    searchQuery,
+    isLoading,
+    filterType,
+    selectedNote,
+    setSelectedNote
+  } = useList()
 
   const handleClick = () => {
     setSelectedNote(null)
@@ -73,12 +81,7 @@ const List: React.FC = () => {
   }
 
   return (
-    <div
-      className="h-full min-h-full"
-      onClick={() => {
-        handleClick
-      }}
-    >
+    <div className="h-full min-h-full mr-1" onClick={handleClick}>
       {filteredNotes.map((note) => (
         <ListItem
           key={note.id}

@@ -193,8 +193,10 @@ export function registerDatabaseIPC(): void {
       height: 1200,
       show: false,
       webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false
+        sandbox: true,
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: true
       }
     })
 
@@ -262,8 +264,10 @@ export function registerDatabaseIPC(): void {
       height: 800,
       show: false,
       webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false
+        sandbox: true,
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: true
       }
     })
 

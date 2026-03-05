@@ -9,12 +9,14 @@ import { registerDatabaseIPC } from './database/ipc'
 import { registerAIIPC } from './ai/ipc'
 
 let mainWindow: BrowserWindow | null = null
+let settingsWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   // Create the browser window.
   mainWindow = new BrowserWindow({
     width: 900,
-    height: 670,
+    height: 740,
+    minHeight: 740,
     show: false,
     minWidth: 810,
     // alwaysOnTop: true,
@@ -52,6 +54,50 @@ function createWindow(): void {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}
+
+function createSettingsWindow(): void {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.show()
+    settingsWindow.focus()
+    return
+  }
+
+  settingsWindow = new BrowserWindow({
+    width: 1200,
+    height: 820,
+    minWidth: 1000,
+    minHeight: 700,
+    show: false,
+    autoHideMenuBar: true,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+    title: 'MindDock Settings',
+    ...(process.platform === 'linux' ? { icon } : {}),
+    ...(process.platform !== 'darwin' ? { titleBarOverlay: true } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false
+    }
+  })
+
+  settingsWindow.on('ready-to-show', () => {
+    settingsWindow?.show()
+  })
+
+  settingsWindow.on('closed', () => {
+    settingsWindow = null
+  })
+
+  settingsWindow.webContents.setWindowOpenHandler((details) => {
+    shell.openExternal(details.url)
+    return { action: 'deny' }
+  })
+
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    settingsWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#/settings`)
+  } else {
+    settingsWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/settings' })
   }
 }
 
@@ -114,6 +160,11 @@ app.whenReady().then(() => {
       console.error('Failed to open path:', error)
       throw error
     }
+  })
+
+  // 打开设置窗口
+  ipcMain.on('open-settings-window', () => {
+    createSettingsWindow()
   })
 
   createWindow()

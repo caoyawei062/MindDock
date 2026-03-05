@@ -486,7 +486,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1">{rightButtons.map(renderButton)}</div>
+        <div className="flex items-center gap-1">{rightButtons.map(renderButtonByType)}</div>
       </div>
     </>
   )

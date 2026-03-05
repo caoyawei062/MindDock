@@ -34,8 +34,6 @@ import { useList, FilterType } from '@renderer/provider/ListProvider'
 import { useExport } from '@renderer/provider/ExportProvider'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
-import { useState } from 'react'
-import { AppSettings } from './Settings/AppSettings'
 
 // 菜单项类型
 interface MenuItem {
@@ -71,7 +69,6 @@ const items: MenuItem[] = [
 export function AppSidebar() {
   const { filterType, setFilterType, notes, recentViews, clearRecentViews, selectedNote, setSelectedNote } = useList()
   const { exports, deleteExport } = useExport()
-  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const handleItemClick = (item: MenuItem) => {
     setFilterType(item.filterType)
@@ -169,7 +166,10 @@ export function AppSidebar() {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => setSettingsOpen(true)} className="cursor-pointer">
+              <SidebarMenuButton
+                onClick={() => window.api.openSettingsWindow()}
+                className="cursor-pointer"
+              >
                 <Settings />
                 <span className="group-data-[collapsible=icon]:hidden">设置</span>
               </SidebarMenuButton>
@@ -245,7 +245,6 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <AppSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   )
 }

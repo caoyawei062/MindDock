@@ -37,6 +37,9 @@ const api = {
   openMainWindow: () => {
     ipcRenderer.send('open-main-window')
   },
+  openSettingsWindow: () => {
+    ipcRenderer.send('open-settings-window')
+  },
   quitApp: () => {
     ipcRenderer.send('quit-app')
   },

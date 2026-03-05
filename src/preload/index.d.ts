@@ -77,6 +77,7 @@ interface API {
   copySnippet: (code: string, title: string) => void
   closeTrayWindow: () => void
   openMainWindow: () => void
+  openSettingsWindow: () => void
   quitApp: () => void
   onThemeChanged: (callback: (theme: string) => void) => () => void
 
@@ -170,4 +171,3 @@ declare global {
     api: API
   }
 }
-

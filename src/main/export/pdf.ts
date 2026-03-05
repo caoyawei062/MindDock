@@ -1,5 +1,26 @@
 import puppeteer from 'puppeteer'
 
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function sanitizeHtml(input: string): string {
+  return input
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object[\s\S]*?>[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[\s\S]*?>[\s\S]*?<\/embed>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/\son\w+=\{[^}]*\}/gi, '')
+    .replace(/javascript:/gi, '')
+}
+
 /**
  * 将 HTML 内容转换为 PDF
  */
@@ -134,13 +155,15 @@ export function contentToHTML(title: string, content: string): string {
     .replace(/^\* (.*$)/gim, '<li>$1</li>')
     // 换行
     .replace(/\n/gim, '<br />')
+  const safeTitle = escapeHtml(title)
+  const safeContent = sanitizeHtml(htmlContent)
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
+  <title>${safeTitle}</title>
   <style>
     * {
       margin: 0;
@@ -264,9 +287,9 @@ export function contentToHTML(title: string, content: string): string {
   </style>
 </head>
 <body>
-  <h1>${title}</h1>
+  <h1>${safeTitle}</h1>
   <div class="content">
-    ${htmlContent}
+    ${safeContent}
   </div>
 </body>
 </html>`

@@ -168,14 +168,12 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
         {/* 内容预览区域 - 移到中间 */}
         <div className="mb-1.5">
           <p className="text-xs text-muted-foreground line-clamp-2 select-text">
-            {note.type === 'whiteboard'
-              ? '白板画布'
-              : note.content
-                ? (() => {
-                    const plain = stripHtml(note.content)
-                    return plain.substring(0, 80) + (plain.length > 80 ? '...' : '')
-                  })()
-                : '暂无内容'}
+            {note.content
+              ? (() => {
+                  const plain = stripHtml(note.content)
+                  return plain.substring(0, 80) + (plain.length > 80 ? '...' : '')
+                })()
+              : '暂无内容'}
           </p>
         </div>
 
