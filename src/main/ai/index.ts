@@ -6,13 +6,23 @@ import { streamText, generateText } from 'ai'
 import { AIModelConfig, AIMessage, AICompletionOptions, AIStreamCallback } from './types'
 import { aiConfigManager } from './config'
 
+type SupportedLanguageModel =
+  | ReturnType<ReturnType<typeof createOpenAI>>
+  | ReturnType<ReturnType<typeof createAnthropic>>
+  | ReturnType<ReturnType<typeof createGoogleGenerativeAI>>
+  | ReturnType<ReturnType<typeof createDeepSeek>>
+
+type SDKMessage = NonNullable<Parameters<typeof streamText>[0]['messages']>[number]
+
 /**
  * AI 服务类
  */
 export class AIService {
   private static instance: AIService
 
-  private constructor() {}
+  private constructor() {
+    // Singleton
+  }
 
   static getInstance(): AIService {
     if (!AIService.instance) {
@@ -24,7 +34,7 @@ export class AIService {
   /**
    * 创建模型实例
    */
-  private createModel(config: AIModelConfig): any {
+  private createModel(config: AIModelConfig): SupportedLanguageModel {
     const { provider, apiKey, baseURL, model } = config
 
     switch (provider) {
@@ -81,7 +91,7 @@ export class AIService {
   /**
    * 转换消息格式
    */
-  private convertMessages(messages: AIMessage[]): Array<{ role: string; content: string }> {
+  private convertMessages(messages: AIMessage[]): SDKMessage[] {
     return messages.map((msg) => ({
       role: msg.role,
       content: msg.content
@@ -114,10 +124,10 @@ export class AIService {
     try {
       const result = await streamText({
         model,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        messages: convertedMessages as any,
+        messages: convertedMessages,
         temperature: options.temperature ?? 0.7,
-        topP: options.topP
+        topP: options.topP,
+        maxOutputTokens: options.maxTokens
       })
 
       for await (const chunk of result.textStream) {
@@ -162,10 +172,10 @@ export class AIService {
     try {
       const result = await generateText({
         model,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        messages: convertedMessages as any,
+        messages: convertedMessages,
         temperature: options.temperature ?? 0.7,
-        topP: options.topP
+        topP: options.topP,
+        maxOutputTokens: options.maxTokens
       })
 
       return {

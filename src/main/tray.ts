@@ -179,7 +179,7 @@ export function initTray(mainWindow: BrowserWindow): void {
  * 更新代码片段列表（已废弃，现在数据存储在数据库中）
  * @deprecated 使用数据库 API 替代
  */
-export function updateSnippets(_snippets: CodeSnippet[]): void {
+export function updateSnippets(): void {
   // 数据现在存储在 SQLite 数据库中
   console.warn('updateSnippets is deprecated. Use database API instead.')
 }

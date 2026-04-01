@@ -95,7 +95,16 @@ export function useAIStream(
   }
 }
 
-export function useAIConfig() {
+export function useAIConfig(): {
+  models: AIModelConfig[]
+  loading: boolean
+  error: string | null
+  loadAllModels: () => Promise<void>
+  loadEnabledModels: () => Promise<void>
+  updateModel: (id: string, updates: Partial<AIModelConfig>) => Promise<AIModelConfig | null>
+  toggleModel: (id: string, enabled: boolean) => Promise<AIModelConfig | null>
+  testModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
+} {
   const [models, setModels] = useState<AIModelConfig[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

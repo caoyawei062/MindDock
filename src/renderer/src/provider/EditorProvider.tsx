@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react'
 import { Editor } from '@tiptap/react'
+import { EditorView as CodeMirrorEditorView } from '@codemirror/view'
 import { OutlineItem } from '../components/business/Edit/OutlineView'
 
 interface EditorContextType {
@@ -27,11 +28,20 @@ interface EditorContextType {
   setAIInputText: (text: string) => void
   getAIInputText: () => string
   clearAIInputText: () => void
+  setAIContextText: (text: string) => void
+  getAIContextText: () => string
+  clearAIContextText: () => void
+  setCodeSelectionText: (text: string) => void
+  getCodeSelectionText: () => string
+  clearCodeSelectionText: () => void
+  setCodeEditorView: (view: CodeMirrorEditorView | null) => void
+  getCodeEditorView: () => CodeMirrorEditorView | null
 }
 
 const EditorContext = createContext<EditorContextType | null>(null)
 
-export function useEditorContext() {
+// eslint-disable-next-line react-refresh/only-export-components
+export function useEditorContext(): EditorContextType {
   const context = useContext(EditorContext)
   if (!context) {
     throw new Error('useEditorContext must be used within EditorProvider')
@@ -43,13 +53,16 @@ interface EditorProviderProps {
   children: ReactNode
 }
 
-export function EditorProvider({ children }: EditorProviderProps) {
+export function EditorProvider({ children }: EditorProviderProps): React.JSX.Element {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [outlineItems, setOutlineItems] = useState<OutlineItem[]>([])
   const [toolbarOpen, setToolbarOpen] = useState(true)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
   const [aiInputText, setAIInputTextState] = useState('')
+  const [aiContextText, setAIContextTextState] = useState('')
+  const [codeSelectionText, setCodeSelectionTextState] = useState('')
+  const [codeEditorView, setCodeEditorViewState] = useState<CodeMirrorEditorView | null>(null)
 
   const toggleOutline = useCallback(() => {
     setOutlineOpen((prev) => !prev)
@@ -74,6 +87,38 @@ export function EditorProvider({ children }: EditorProviderProps) {
   const clearAIInputText = useCallback(() => {
     setAIInputTextState('')
   }, [])
+
+  const setAIContextText = useCallback((text: string) => {
+    setAIContextTextState(text)
+  }, [])
+
+  const getAIContextText = useCallback(() => {
+    return aiContextText
+  }, [aiContextText])
+
+  const clearAIContextText = useCallback(() => {
+    setAIContextTextState('')
+  }, [])
+
+  const setCodeSelectionText = useCallback((text: string) => {
+    setCodeSelectionTextState(text)
+  }, [])
+
+  const getCodeSelectionText = useCallback(() => {
+    return codeSelectionText
+  }, [codeSelectionText])
+
+  const clearCodeSelectionText = useCallback(() => {
+    setCodeSelectionTextState('')
+  }, [])
+
+  const setCodeEditorView = useCallback((view: CodeMirrorEditorView | null) => {
+    setCodeEditorViewState(view)
+  }, [])
+
+  const getCodeEditorView = useCallback(() => {
+    return codeEditorView
+  }, [codeEditorView])
 
   // 从编辑器内容提取大纲
   const updateOutlineItems = useCallback(() => {
@@ -123,7 +168,15 @@ export function EditorProvider({ children }: EditorProviderProps) {
       toggleAiPanel,
       setAIInputText,
       getAIInputText,
-      clearAIInputText
+      clearAIInputText,
+      setAIContextText,
+      getAIContextText,
+      clearAIContextText,
+      setCodeSelectionText,
+      getCodeSelectionText,
+      clearCodeSelectionText,
+      setCodeEditorView,
+      getCodeEditorView
     }),
     [
       editor,
@@ -137,7 +190,15 @@ export function EditorProvider({ children }: EditorProviderProps) {
       toggleAiPanel,
       setAIInputText,
       getAIInputText,
-      clearAIInputText
+      clearAIInputText,
+      setAIContextText,
+      getAIContextText,
+      clearAIContextText,
+      setCodeSelectionText,
+      getCodeSelectionText,
+      clearCodeSelectionText,
+      setCodeEditorView,
+      getCodeEditorView
     ]
   )
 

@@ -244,7 +244,7 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
   const tagResults = db.prepare(tagSearchSql).all(...tagSearchParams) as Note[]
 
   // 使用 FTS5 搜索标题和内容
-  let ftsSql = `
+  const ftsSql = `
     SELECT n.* FROM notes n
     JOIN notes_fts fts ON n.rowid = fts.rowid
     WHERE notes_fts MATCH ? AND n.is_trashed = 0
@@ -261,7 +261,7 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
     textResults = db.prepare(ftsSql).all(...ftsParams) as Note[]
   } catch {
     // FTS 搜索失败，回退到 LIKE 搜索
-    let fallbackSql = `
+    const fallbackSql = `
       SELECT * FROM notes
       WHERE is_trashed = 0 AND (title LIKE ? OR content LIKE ?)
       ${type ? 'AND type = ?' : ''}
@@ -280,19 +280,19 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
   const allResults = new Map<string, Note>()
 
   // 先添加标签匹配的结果（优先级更高）
-  tagResults.forEach(note => {
+  tagResults.forEach((note) => {
     allResults.set(note.id, note)
   })
 
   // 再添加文本搜索的结果
-  textResults.forEach(note => {
+  textResults.forEach((note) => {
     allResults.set(note.id, note)
   })
 
   // 转换为数组并排序：标签匹配的在前，然后按更新时间排序
   const results = Array.from(allResults.values()).sort((a, b) => {
-    const aInTag = tagResults.some(t => t.id === a.id)
-    const bInTag = tagResults.some(t => t.id === b.id)
+    const aInTag = tagResults.some((t) => t.id === a.id)
+    const bInTag = tagResults.some((t) => t.id === b.id)
 
     if (aInTag && !bInTag) return -1
     if (!aInTag && bInTag) return 1

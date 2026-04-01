@@ -4,7 +4,6 @@ import Tiptap from '../components/business/Edit/Tiptap'
 import Codemirror from '../components/business/Edit/Codemirror'
 import OutlineView from '../components/business/Edit/OutlineView'
 import WelcomeView from '../components/business/Edit/WelcomeView'
-import ScrollArea from '@renderer/components/ui/scroll-area'
 import { useEditorContext } from '@renderer/provider/EditorProvider'
 import { useNoteEditor } from '@renderer/hooks/useNoteEditor'
 import { cn } from '@/lib/utils'
@@ -15,8 +14,16 @@ import { AISidebar } from '@renderer/components/business/AI'
 // 窄屏阈值（像素）
 const NARROW_THRESHOLD = 500
 
-const EditLayout = () => {
-  const { outlineOpen, outlineItems, editor, aiPanelOpen } = useEditorContext()
+const EditLayout = (): React.JSX.Element => {
+  const {
+    outlineOpen,
+    outlineItems,
+    editor,
+    aiPanelOpen,
+    setCodeSelectionText,
+    clearCodeSelectionText,
+    setCodeEditorView
+  } = useEditorContext()
   const {
     note,
     title,
@@ -53,6 +60,13 @@ const EditLayout = () => {
     return () => observer.disconnect()
   }, [])
 
+  React.useEffect(() => {
+    if (editorMode !== 'code') {
+      clearCodeSelectionText()
+      setCodeEditorView(null)
+    }
+  }, [editorMode, clearCodeSelectionText, setCodeEditorView])
+
   // 处理 AI 侧边栏拖拽
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -84,17 +98,11 @@ const EditLayout = () => {
 
   // 点击大纲项滚动到对应位置
   const handleOutlineItemClick = useCallback(
-    (id: string) => {
+    (id: string): void => {
       if (!editor) return
 
       const pos = parseInt(id.replace('heading-', ''), 10)
-      editor.chain().focus().setTextSelection(pos).run()
-
-      // 滚动到视图
-      const element = editor.view.domAtPos(pos)
-      if (element.node instanceof HTMLElement) {
-        element.node.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
+      editor.chain().focus().setTextSelection(pos).scrollIntoView().run()
     },
     [editor]
   )
@@ -171,7 +179,7 @@ const EditLayout = () => {
         )}
 
         {/* 编辑器 */}
-        <ScrollArea
+        <div
           className={cn(
             'flex-1 w-full min-w-0 overflow-hidden',
             outlineOpen && !isNarrow && 'border-l-0',
@@ -186,9 +194,11 @@ const EditLayout = () => {
               onChange={setCodeContent}
               language={selectedLanguage}
               config={codeMirrorConfig}
+              onSelectionChange={setCodeSelectionText}
+              onEditorReady={setCodeEditorView}
             />
           )}
-        </ScrollArea>
+        </div>
 
         {/* AI 侧边栏 */}
         {aiPanelOpen && (
@@ -207,7 +217,7 @@ const EditLayout = () => {
 
             {/* 侧边栏 */}
             <div className="shrink-0 overflow-hidden" style={{ width: `${aiSidebarWidth}px` }}>
-              <AISidebar className="h-full" />
+              <AISidebar className="h-full" editorMode={editorMode} />
             </div>
           </>
         )}

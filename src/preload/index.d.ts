@@ -1,5 +1,12 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { THEME } from '../constants/index'
+import {
+  AICompletionOptions,
+  AICompletionResult,
+  AIMessage,
+  AIModelConfig,
+  AIProvider
+} from '../renderer/src/types/ai'
 
 interface CodeSnippet {
   id: string
@@ -66,6 +73,17 @@ interface ExportRecord {
   file_path: string
   export_type: 'markdown' | 'html' | 'pdf' | 'image'
   created_at: string
+}
+
+interface AIStreamResponse {
+  success: boolean
+  error?: string
+}
+
+interface AIGenerateResponse {
+  success: boolean
+  data?: AICompletionResult
+  error?: string
 }
 
 interface API {
@@ -151,18 +169,28 @@ interface API {
   tagsGetNoteIds: (tagId: string) => Promise<string[]>
 
   // AI API
-  aiGetAllModels: () => Promise<any[]>
-  aiGetEnabledModels: () => Promise<any[]>
-  aiGetModelById: (id: string) => Promise<any>
-  aiUpdateModel: (id: string, updates: any) => Promise<any>
-  aiToggleModel: (id: string, enabled: boolean) => Promise<any>
-  aiGetModelsByProvider: (provider: string) => Promise<any[]>
-  aiStreamCompletion: (modelId: string, messages: any[], options: any, sessionId: string) => Promise<any>
+  aiGetAllModels: () => Promise<AIModelConfig[]>
+  aiGetEnabledModels: () => Promise<AIModelConfig[]>
+  aiGetModelById: (id: string) => Promise<AIModelConfig | undefined>
+  aiUpdateModel: (id: string, updates: Partial<AIModelConfig>) => Promise<AIModelConfig | null>
+  aiToggleModel: (id: string, enabled: boolean) => Promise<AIModelConfig | null>
+  aiGetModelsByProvider: (provider: AIProvider) => Promise<AIModelConfig[]>
+  aiStreamCompletion: (
+    modelId: string,
+    messages: AIMessage[],
+    options: Partial<AICompletionOptions>,
+    sessionId: string
+  ) => Promise<AIStreamResponse>
   aiOnStreamChunk: (sessionId: string, callback: (chunk: string) => void) => () => void
   aiOnStreamComplete: (sessionId: string, callback: () => void) => () => void
   aiOnStreamError: (sessionId: string, callback: (error: string) => void) => () => void
-  aiGenerateCompletion: (modelId: string, messages: any[], options: any) => Promise<any>
+  aiGenerateCompletion: (
+    modelId: string,
+    messages: AIMessage[],
+    options: Partial<AICompletionOptions>
+  ) => Promise<AIGenerateResponse>
   aiTestModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
+  runTypecheck: () => Promise<{ success: boolean; output: string }>
 }
 
 declare global {

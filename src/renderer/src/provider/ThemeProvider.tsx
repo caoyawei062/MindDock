@@ -13,19 +13,14 @@ type ThemeProviderState = {
   setTheme: (theme: Theme) => void
 }
 
-const initialState: ThemeProviderState = {
-  theme: 'system',
-  setTheme: () => null
-}
-
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
+const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undefined)
 
 export function ThemeProvider({
   children,
   defaultTheme = 'system',
   storageKey = 'vite-ui-theme',
   ...props
-}: ThemeProviderProps) {
+}: ThemeProviderProps): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   )
@@ -84,10 +79,13 @@ export function ThemeProvider({
   )
 }
 
-export const useTheme = () => {
+// eslint-disable-next-line react-refresh/only-export-components
+export const useTheme = (): ThemeProviderState => {
   const context = useContext(ThemeProviderContext)
 
-  if (context === undefined) throw new Error('useTheme must be used within a ThemeProvider')
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider')
+  }
 
   return context
 }

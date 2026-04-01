@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@renderer/components/ui/button'
 import { Textarea } from '@renderer/components/ui/textarea'
-import { AIMessage } from '@renderer/types/ai'
+import { AIMessage, AIModelConfig } from '@renderer/types/ai'
 import {
   Select,
   SelectContent,
@@ -16,23 +16,19 @@ interface AIAssistantProps {
   onInsert?: (text: string) => void
 }
 
-export function AIAssistant({ className, onInsert }: AIAssistantProps) {
-  const [models, setModels] = useState<any[]>([])
+export function AIAssistant({
+  className,
+  onInsert
+}: AIAssistantProps): React.JSX.Element {
+  const [models, setModels] = useState<AIModelConfig[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [messages, setMessages] = useState<AIMessage[]>([])
   const [input, setInput] = useState('')
   const [response, setResponse] = useState('')
   const responseEndRef = useRef<HTMLDivElement>(null)
+  const responseRef = useRef('')
 
-  useEffect(() => {
-    loadModels()
-  }, [])
-
-  useEffect(() => {
-    responseEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [response])
-
-  const loadModels = async () => {
+  const loadModels = async (): Promise<void> => {
     try {
       const enabledModels = await window.api.aiGetEnabledModels()
       setModels(enabledModels)
@@ -43,6 +39,16 @@ export function AIAssistant({ className, onInsert }: AIAssistantProps) {
       console.error('Failed to load models:', error)
     }
   }
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadModels()
+    })
+  }, [])
+
+  useEffect(() => {
+    responseEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [response])
 
   const handleSend = async (): Promise<void> => {
     if (!input.trim() || !selectedModel) return
@@ -56,16 +62,20 @@ export function AIAssistant({ className, onInsert }: AIAssistantProps) {
     setMessages(newMessages)
     setInput('')
     setResponse('')
+    responseRef.current = ''
 
     const onChunk = (chunk: string): void => {
-      setResponse((prev) => prev + chunk)
+      setResponse((prev) => {
+        const next = prev + chunk
+        responseRef.current = next
+        return next
+      })
     }
 
     const onComplete = (): void => {
       setMessages((prev) => [
         ...prev,
-        userMessage,
-        { role: 'assistant', content: response }
+        { role: 'assistant', content: responseRef.current }
       ])
     }
 
@@ -94,12 +104,13 @@ export function AIAssistant({ className, onInsert }: AIAssistantProps) {
     }
   }
 
-  const handleClear = () => {
+  const handleClear = (): void => {
     setMessages([])
     setResponse('')
+    responseRef.current = ''
   }
 
-  const handleInsert = () => {
+  const handleInsert = (): void => {
     if (response && onInsert) {
       onInsert(response)
     }

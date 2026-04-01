@@ -84,7 +84,6 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   title,
   onTitleChange,
   mode = 'word',
-  onModeChange: _onModeChange,
   languages = DEFAULT_LANGUAGES,
   selectedLanguage = 'javascript',
   onLanguageChange,
@@ -104,7 +103,10 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
     aiPanelOpen,
     toggleAiPanel,
     editor,
-    setAIInputText
+    setAIInputText,
+    setAIContextText,
+    clearAIContextText,
+    getCodeSelectionText
   } = useEditorContext()
   const { exportToPDF, exportToImage, exportToMarkdown } = useExport()
   const { deleteNote } = useList()
@@ -116,15 +118,33 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
 
   // 处理 AI 按钮点击
   const handleAIButtonClick = useCallback(() => {
-    if (editor) {
+    if (mode === 'word' && editor) {
       const { from, to } = editor.state.selection
       if (from !== to) {
         const selectedText = editor.state.doc.textBetween(from, to)
-        setAIInputText(selectedText)
+        setAIContextText(selectedText)
+      } else {
+        clearAIContextText()
+      }
+    } else if (mode === 'code') {
+      const selectedCode = getCodeSelectionText()
+      if (selectedCode.trim()) {
+        setAIContextText(selectedCode)
+      } else {
+        clearAIContextText()
       }
     }
+    setAIInputText('')
     toggleAiPanel()
-  }, [editor, setAIInputText, toggleAiPanel])
+  }, [
+    mode,
+    editor,
+    setAIContextText,
+    clearAIContextText,
+    getCodeSelectionText,
+    setAIInputText,
+    toggleAiPanel
+  ])
 
   // 处理导出为 PDF
   const handleExportPDF = useCallback(async () => {
@@ -188,18 +208,18 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
     setEditValue(title)
   }, [title])
 
-  const handleTitleClick = () => {
+  const handleTitleClick = (): void => {
     setEditValue(title)
     setIsEditing(true)
   }
 
-  const handleTitleBlur = () => {
+  const handleTitleBlur = (): void => {
     setIsEditing(false)
     const newTitle = editValue.trim() || '未命名文档'
     onTitleChange(newTitle)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter') {
       setIsEditing(false)
       const newTitle = editValue.trim() || '未命名文档'
@@ -293,18 +313,18 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   )
 
   // 根据模式过滤按钮
-  const filterButtonsByMode = (buttons: ToolButtonConfig[]) => {
+  const filterButtonsByMode = (buttons: ToolButtonConfig[]): ToolButtonConfig[] => {
     return buttons.filter((btn) => !btn.modes || btn.modes.includes(mode))
   }
 
   // 渲染单个按钮
-  const renderButton = (btn: ToolButtonConfig) => {
+  const renderButton = (btn: ToolButtonConfig): React.JSX.Element => {
     const Icon = btn.icon
     const tooltipText = typeof btn.tooltip === 'function' ? btn.tooltip() : btn.tooltip
     const isActive = typeof btn.isActive === 'function' ? btn.isActive() : btn.isActive
     const isDisabled = btn.disabled || false
 
-    const getButtonClassName = () => {
+    const getButtonClassName = (): string => {
       if (isDisabled) {
         return 'opacity-50 cursor-not-allowed text-muted-foreground'
       }
@@ -348,7 +368,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   )
 
   // 渲染带 TagInputDropdown 的按钮
-  const renderTagButton = (btn: ToolButtonConfig) => {
+  const renderTagButton = (btn: ToolButtonConfig): React.JSX.Element => {
     const Icon = btn.icon
     const tooltipText = typeof btn.tooltip === 'function' ? btn.tooltip() : btn.tooltip
     // const isActive = tags.length > 0
@@ -375,7 +395,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   }
 
   // 渲染按钮（根据类型选择不同渲染方式）
-  const renderButtonByType = (btn: ToolButtonConfig) => {
+  const renderButtonByType = (btn: ToolButtonConfig): React.JSX.Element => {
     if (btn.id === 'tag') {
       return renderTagButton(btn)
     }

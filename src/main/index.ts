@@ -1,5 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, nativeTheme } from 'electron'
 import { join } from 'path'
+import { execFile } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { CHANGETHEME } from '../constants'
@@ -10,6 +11,22 @@ import { registerAIIPC } from './ai/ipc'
 
 let mainWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
+
+function runTypecheck(): Promise<{ success: boolean; output: string }> {
+  return new Promise((resolve) => {
+    const cwd = app.getAppPath()
+    const command = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+
+    execFile(command, ['run', 'typecheck'], { cwd, maxBuffer: 1024 * 1024 * 8 }, (error, stdout, stderr) => {
+      const output = `${stdout}${stderr}`.trim()
+      if (error) {
+        resolve({ success: false, output: output || error.message })
+        return
+      }
+      resolve({ success: true, output })
+    })
+  })
+}
 
 function createWindow(): void {
   // Create the browser window.
@@ -160,6 +177,10 @@ app.whenReady().then(() => {
       console.error('Failed to open path:', error)
       throw error
     }
+  })
+
+  ipcMain.handle('dev:run-typecheck', async () => {
+    return runTypecheck()
   })
 
   // 打开设置窗口

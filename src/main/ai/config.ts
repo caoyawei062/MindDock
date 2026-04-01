@@ -19,7 +19,9 @@ export class AIConfigManager {
   private cache: Map<string, AIModelConfig> = new Map()
   private cacheInitialized = false
 
-  private constructor() {}
+  private constructor() {
+    // Singleton
+  }
 
   static getInstance(): AIConfigManager {
     if (!AIConfigManager.instance) {

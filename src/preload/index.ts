@@ -1,6 +1,12 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { CHANGETHEME, THEME } from '../constants/index'
+import type {
+  AICompletionOptions,
+  AIMessage,
+  AIModelConfig,
+  AIProvider
+} from '../renderer/src/types/ai'
 
 interface CodeSnippet {
   id: string
@@ -226,7 +232,7 @@ const api = {
     return ipcRenderer.invoke('ai:models:getById', id)
   },
   // 更新模型配置
-  aiUpdateModel: (id: string, updates: any) => {
+  aiUpdateModel: (id: string, updates: Partial<AIModelConfig>) => {
     return ipcRenderer.invoke('ai:models:update', id, updates)
   },
   // 启用/禁用模型
@@ -234,38 +240,51 @@ const api = {
     return ipcRenderer.invoke('ai:models:toggle', id, enabled)
   },
   // 根据提供商获取模型
-  aiGetModelsByProvider: (provider: string) => {
+  aiGetModelsByProvider: (provider: AIProvider) => {
     return ipcRenderer.invoke('ai:models:getByProvider', provider)
   },
   // 流式生成文本
-  aiStreamCompletion: (modelId: string, messages: any[], options: any, sessionId: string) => {
+  aiStreamCompletion: (
+    modelId: string,
+    messages: AIMessage[],
+    options: Partial<AICompletionOptions>,
+    sessionId: string
+  ) => {
     return ipcRenderer.invoke('ai:completion:stream', modelId, messages, options, sessionId)
   },
   // 监听流式数据
-  aiOnStreamChunk: (sessionId: string, callback: (chunk: string) => void) => {
-    const listener = (_: any, chunk: string) => callback(chunk)
+  aiOnStreamChunk: (sessionId: string, callback: (chunk: string) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, chunk: string): void => callback(chunk)
     ipcRenderer.on(`ai:stream:chunk:${sessionId}`, listener)
     return () => ipcRenderer.removeListener(`ai:stream:chunk:${sessionId}`, listener)
   },
   // 监听流式完成
-  aiOnStreamComplete: (sessionId: string, callback: () => void) => {
-    const listener = () => callback()
+  aiOnStreamComplete: (sessionId: string, callback: () => void): (() => void) => {
+    const listener = (): void => callback()
     ipcRenderer.once(`ai:stream:complete:${sessionId}`, listener)
     return () => ipcRenderer.removeListener(`ai:stream:complete:${sessionId}`, listener)
   },
   // 监听流式错误
-  aiOnStreamError: (sessionId: string, callback: (error: string) => void) => {
-    const listener = (_: any, error: string) => callback(error)
+  aiOnStreamError: (sessionId: string, callback: (error: string) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, error: string): void => callback(error)
     ipcRenderer.once(`ai:stream:error:${sessionId}`, listener)
     return () => ipcRenderer.removeListener(`ai:stream:error:${sessionId}`, listener)
   },
   // 一次性生成文本
-  aiGenerateCompletion: (modelId: string, messages: any[], options: any) => {
+  aiGenerateCompletion: (
+    modelId: string,
+    messages: AIMessage[],
+    options: Partial<AICompletionOptions>
+  ) => {
     return ipcRenderer.invoke('ai:completion:generate', modelId, messages, options)
   },
   // 测试模型连接
   aiTestModel: (modelId: string) => {
     return ipcRenderer.invoke('ai:model:test', modelId)
+  },
+  // 开发环境校验
+  runTypecheck: () => {
+    return ipcRenderer.invoke('dev:run-typecheck')
   }
 }
 

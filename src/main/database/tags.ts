@@ -92,7 +92,7 @@ export function updateTag(id: string, params: { name?: string; color?: string })
   }
 
   const updates: string[] = []
-  const values: any[] = []
+  const values: Array<string | null> = []
 
   if (params.name) {
     updates.push('name = ?')

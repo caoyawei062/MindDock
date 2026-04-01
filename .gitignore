@@ -5,3 +5,6 @@ out
 .eslintcache
 *.log*
 .data
+task_plan.md
+findings.md
+progress.md

@@ -57,12 +57,12 @@ export function getFolderTree(): Folder[] {
   const rootFolders: (Folder & { children: Folder[] })[] = []
 
   // 初始化 map
-  folders.forEach(folder => {
+  folders.forEach((folder) => {
     folderMap.set(folder.id, { ...folder, children: [] })
   })
 
   // 构建树
-  folders.forEach(folder => {
+  folders.forEach((folder) => {
     const folderWithChildren = folderMap.get(folder.id)!
     if (folder.parent_id && folderMap.has(folder.parent_id)) {
       folderMap.get(folder.parent_id)!.children.push(folderWithChildren)
@@ -80,7 +80,7 @@ export function getFolderTree(): Folder[] {
 export function getFolderById(id: string): Folder | null {
   const db = getDatabase()
   const stmt = db.prepare('SELECT * FROM folders WHERE id = ?')
-  const result = stmt.get(id) as any
+  const result = stmt.get(id) as Folder | undefined
   return result || null
 }
 
@@ -136,7 +136,7 @@ export function updateFolder(id: string, params: UpdateFolderParams): Folder | n
   }
 
   const updates: string[] = []
-  const values: any[] = []
+  const values: Array<string | number | null> = []
 
   if (params.name !== undefined) {
     updates.push('name = ?')

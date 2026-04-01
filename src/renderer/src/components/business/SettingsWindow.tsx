@@ -10,47 +10,16 @@ import { cn } from '@/lib/utils'
 import {
   AlertCircle,
   Bot,
-  Brain,
-  Cable,
   CheckCircle2,
-  Chrome,
-  Folder,
-  Globe,
   Loader2,
-  MessageSquare,
-  Mic,
   Moon,
-  Palette,
-  Plug,
   Search,
   Settings,
-  Sparkles,
   Sun,
-  Users,
-  WandSparkles,
-  Waves,
-  Wrench,
   X
 } from 'lucide-react'
 
-type SettingsSection =
-  | 'general'
-  | 'providers'
-  | 'projects'
-  | 'chat'
-  | 'prompts'
-  | 'memory'
-  | 'mcp'
-  | 'skills'
-  | 'plugins'
-  | 'hooks'
-  | 'voice'
-  | 'tts'
-  | 'people'
-  | 'channels'
-  | 'web-search'
-  | 'chrome-relay'
-  | 'ui'
+type SettingsSection = 'general' | 'providers'
 
 interface ProviderSummary {
   provider: AIProvider
@@ -69,22 +38,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'general', label: '通用', icon: Settings, keywords: ['theme', 'general'] },
-  { id: 'providers', label: '提供商', icon: Bot, keywords: ['model', 'api'] },
-  { id: 'projects', label: '项目', icon: Folder },
-  { id: 'chat', label: '聊天', icon: MessageSquare },
-  { id: 'prompts', label: '快捷提示', icon: Sparkles },
-  { id: 'memory', label: '记忆', icon: Brain },
-  { id: 'mcp', label: 'MCP 服务', icon: Cable },
-  { id: 'skills', label: '技能', icon: Wrench },
-  { id: 'plugins', label: 'Plugins', icon: Plug },
-  { id: 'hooks', label: '钩子', icon: WandSparkles },
-  { id: 'voice', label: '语音', icon: Mic },
-  { id: 'tts', label: 'Text-to-Speech', icon: Waves, keywords: ['tts'] },
-  { id: 'people', label: 'People', icon: Users },
-  { id: 'channels', label: '渠道', icon: Cable },
-  { id: 'web-search', label: '网络搜索', icon: Globe },
-  { id: 'chrome-relay', label: 'Chrome Relay', icon: Chrome },
-  { id: 'ui', label: '用户界面', icon: Palette }
+  { id: 'providers', label: 'AI 提供商', icon: Bot, keywords: ['model', 'api', 'provider'] }
 ]
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
@@ -215,7 +169,7 @@ function SettingsWindow(): React.JSX.Element {
       if (isDirty) return '提供商配置有未保存更改'
       return '提供商配置已保存'
     }
-    return '当前分区配置可继续扩展'
+    return '当前设置页聚焦主题与 AI 配置，其他偏好项将在核心功能稳定后逐步补充。'
   }, [activeSection, isDirty, isSaving])
 
   const handleSaveProviderConfig = async (): Promise<boolean> => {
@@ -243,7 +197,7 @@ function SettingsWindow(): React.JSX.Element {
     }
   }
 
-  const handleResetDraft = () => {
+  const handleResetDraft = (): void => {
     if (!selectedProvider || selectedProviderModels.length === 0) return
     const apiKeys = selectedProviderModels.map((model) => model.apiKey || '')
     const baseURLs = selectedProviderModels.map((model) => model.baseURL || '')
@@ -252,16 +206,16 @@ function SettingsWindow(): React.JSX.Element {
     setIsDirty(false)
   }
 
-  const handleToggleProvider = async (enabled: boolean) => {
+  const handleToggleProvider = async (enabled: boolean): Promise<void> => {
     if (!selectedProvider || selectedProviderModels.length === 0) return
     await Promise.all(selectedProviderModels.map((model) => toggleModel(model.id, enabled)))
   }
 
-  const handleToggleModel = async (modelId: string, enabled: boolean) => {
+  const handleToggleModel = async (modelId: string, enabled: boolean): Promise<void> => {
     await toggleModel(modelId, enabled)
   }
 
-  const handleTestProvider = async () => {
+  const handleTestProvider = async (): Promise<void> => {
     if (!selectedProvider || selectedProviderModels.length === 0) return
 
     if (isDirty) {
@@ -279,7 +233,7 @@ function SettingsWindow(): React.JSX.Element {
     setTestingProvider(null)
   }
 
-  const renderGeneralSection = () => {
+  const renderGeneralSection = (): React.JSX.Element => {
     return (
       <ScrollArea className="h-full pr-1">
         <div className="space-y-4 pb-2">
@@ -347,9 +301,9 @@ function SettingsWindow(): React.JSX.Element {
           </section>
 
           <section className="rounded-2xl border border-dashed p-6">
-            <h3 className="text-lg font-semibold">预留配置位</h3>
+            <h3 className="text-lg font-semibold">当前范围</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              后续可在“通用”下继续增加编辑器偏好、快捷键、启动行为等配置。
+              MindDock 当前聚焦本地笔记、代码片段和 AI 辅助工作流。设置页暂时只保留已落地的主题与模型配置，避免界面范围先于产品能力扩张。
             </p>
           </section>
         </div>
@@ -357,7 +311,7 @@ function SettingsWindow(): React.JSX.Element {
     )
   }
 
-  const renderProvidersSection = () => {
+  const renderProvidersSection = (): React.JSX.Element => {
     return (
       <div className="h-full min-h-0">
         <div className="grid h-full min-h-0 grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -623,53 +577,12 @@ function SettingsWindow(): React.JSX.Element {
     )
   }
 
-  const renderPlaceholderSection = (title: string) => {
-    return (
-      <ScrollArea className="h-full pr-1">
-        <section className="rounded-2xl border border-dashed p-8 text-center">
-          <h3 className="text-xl font-semibold">{title}</h3>
-          <p className="mt-2 text-sm text-muted-foreground">该设置分区正在规划中，后续可继续扩展。</p>
-        </section>
-      </ScrollArea>
-    )
-  }
-
-  const renderContent = () => {
+  const renderContent = (): React.JSX.Element | null => {
     switch (activeSection) {
       case 'general':
         return renderGeneralSection()
       case 'providers':
         return renderProvidersSection()
-      case 'projects':
-        return renderPlaceholderSection('项目')
-      case 'chat':
-        return renderPlaceholderSection('聊天')
-      case 'prompts':
-        return renderPlaceholderSection('快捷提示')
-      case 'memory':
-        return renderPlaceholderSection('记忆')
-      case 'mcp':
-        return renderPlaceholderSection('MCP 服务')
-      case 'skills':
-        return renderPlaceholderSection('技能')
-      case 'plugins':
-        return renderPlaceholderSection('Plugins')
-      case 'hooks':
-        return renderPlaceholderSection('钩子')
-      case 'voice':
-        return renderPlaceholderSection('语音')
-      case 'tts':
-        return renderPlaceholderSection('Text-to-Speech')
-      case 'people':
-        return renderPlaceholderSection('People')
-      case 'channels':
-        return renderPlaceholderSection('渠道')
-      case 'web-search':
-        return renderPlaceholderSection('网络搜索')
-      case 'chrome-relay':
-        return renderPlaceholderSection('Chrome Relay')
-      case 'ui':
-        return renderPlaceholderSection('用户界面')
       default:
         return null
     }

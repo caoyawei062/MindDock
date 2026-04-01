@@ -55,6 +55,7 @@ import {
   deleteAIConfig
 } from './ai-configs'
 import { contentToHTML } from '../export/pdf'
+import { AIModelConfig, AIProvider } from '../ai/types'
 
 /**
  * 注册数据库相关的 IPC 处理器
@@ -426,8 +427,8 @@ export function registerDatabaseIPC(): void {
   })
 
   // 根据提供商获取 AI 配置
-  ipcMain.handle('db:ai:getByProvider', (_, provider: string) => {
-    return getAIConfigsByProvider(provider as any)
+  ipcMain.handle('db:ai:getByProvider', (_, provider: AIProvider) => {
+    return getAIConfigsByProvider(provider)
   })
 
   // 根据 ID 获取 AI 配置
@@ -436,12 +437,12 @@ export function registerDatabaseIPC(): void {
   })
 
   // 创建或更新 AI 配置
-  ipcMain.handle('db:ai:upsert', (_, config: any) => {
+  ipcMain.handle('db:ai:upsert', (_, config: AIModelConfig) => {
     return upsertAIConfig(config)
   })
 
   // 更新 AI 配置的部分字段
-  ipcMain.handle('db:ai:update', (_, id: string, updates: any) => {
+  ipcMain.handle('db:ai:update', (_, id: string, updates: Partial<AIModelConfig>) => {
     return updateAIConfig(id, updates)
   })
 

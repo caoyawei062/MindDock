@@ -642,7 +642,10 @@ const Tiptap: React.FC = () => {
         {/* 固定工具栏 */}
         {toolbarOpen && <EditorToolbar editor={editor} />}
 
-        <EditorContent editor={editor} className="flex-1 min-w-0 overflow-auto scrollbar-none" />
+        <EditorContent
+          editor={editor}
+          className="custom-scrollbar flex-1 min-w-0 overflow-y-auto overflow-x-hidden"
+        />
 
         {/* 格式化气泡菜单 - 包含 AI 功能 */}
         <AIBubbleMenuWrapper editor={editor} />
