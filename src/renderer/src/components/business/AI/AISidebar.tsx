@@ -85,10 +85,22 @@ interface DiffLine {
   content: string
 }
 
+interface SearchReplaceBlock {
+  search: string
+  replace: string
+}
+
+interface FencedCodeBlock {
+  language: string
+  content: string
+}
+
 interface AgentResponseParts {
   summaryLines: string[]
   code: string
   body: string
+  patches: SearchReplaceBlock[]
+  unifiedDiff: string
 }
 
 interface AgentRun {
@@ -110,18 +122,51 @@ function createMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+function extractFencedCodeBlocks(content: string): FencedCodeBlock[] {
+  const matches = content.matchAll(/```([\w-]*)\n?([\s\S]*?)```/g)
+  return Array.from(matches, (match) => ({
+    language: match[1]?.trim() ?? '',
+    content: match[2].trim()
+  })).filter((item) => item.content.length > 0)
+}
+
 function extractCodeBlocks(content: string): string[] {
-  const matches = content.matchAll(/```[\w-]*\n?([\s\S]*?)```/g)
-  return Array.from(matches, (match) => match[1].trim()).filter(Boolean)
+  return extractFencedCodeBlocks(content).map((item) => item.content)
 }
 
 function extractBodyContent(content: string): string {
-  return content.replace(/```[\w-]*\n?[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim()
+  return content
+    .replace(/```[\w-]*\n?[\s\S]*?```/g, '')
+    .replace(/<<<<<<< SEARCH\r?\n[\s\S]*?\r?\n=======\r?\n[\s\S]*?\r?\n>>>>>>> REPLACE/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function extractSearchReplaceBlocks(content: string): SearchReplaceBlock[] {
+  const matches = content.matchAll(
+    /<<<<<<< SEARCH\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n>>>>>>> REPLACE/g
+  )
+
+  return Array.from(matches, (match) => ({
+    search: match[1],
+    replace: match[2]
+  })).filter((item) => item.search.length > 0 || item.replace.length > 0)
+}
+
+function extractUnifiedDiff(content: string): string {
+  const diffBlock = extractFencedCodeBlocks(content).find((block) => block.language === 'diff')
+  if (diffBlock) return diffBlock.content
+
+  const body = extractBodyContent(content)
+  const hunkMatch = body.match(/@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@[\s\S]*/)
+  return hunkMatch?.[0]?.trim() ?? ''
 }
 
 function parseAgentResponse(content: string): AgentResponseParts {
   const code = extractCodeBlocks(content)[0] ?? ''
   const body = extractBodyContent(content)
+  const patches = extractSearchReplaceBlocks(content)
+  const unifiedDiff = extractUnifiedDiff(content)
   const summaryLines = body
     .split('\n')
     .map((line) => line.trim())
@@ -132,8 +177,118 @@ function parseAgentResponse(content: string): AgentResponseParts {
   return {
     summaryLines,
     code,
-    body
+    body,
+    patches,
+    unifiedDiff
   }
+}
+
+function applyUnifiedDiff(source: string, diffText: string): string {
+  const lines = diffText.replace(/\r/g, '').split('\n')
+  const hunks: Array<{ oldStart: number; lines: string[] }> = []
+  let currentHunk: { oldStart: number; lines: string[] } | null = null
+
+  lines.forEach((line) => {
+    const headerMatch = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (headerMatch) {
+      if (currentHunk) hunks.push(currentHunk)
+      currentHunk = {
+        oldStart: Number(headerMatch[1]),
+        lines: []
+      }
+      return
+    }
+
+    if (!currentHunk) return
+    if (line.startsWith('\\ No newline at end of file')) return
+    if (/^[ +-]/.test(line)) {
+      currentHunk.lines.push(line)
+    }
+  })
+
+  if (currentHunk) {
+    hunks.push(currentHunk)
+  }
+
+  if (hunks.length === 0) {
+    throw new Error('未找到可应用的 unified diff hunk。')
+  }
+
+  const sourceLines = source.replace(/\r/g, '').split('\n')
+  const result: string[] = []
+  let sourceIndex = 0
+
+  hunks.forEach((hunk, hunkIndex) => {
+    const hunkStart = Math.max(0, hunk.oldStart - 1)
+    while (sourceIndex < hunkStart) {
+      result.push(sourceLines[sourceIndex])
+      sourceIndex += 1
+    }
+
+    hunk.lines.forEach((line) => {
+      const prefix = line[0]
+      const contentLine = line.slice(1)
+
+      if (prefix === ' ') {
+        if (sourceLines[sourceIndex] !== contentLine) {
+          throw new Error(`第 ${hunkIndex + 1} 个 diff hunk 的上下文与当前文件不匹配。`)
+        }
+        result.push(contentLine)
+        sourceIndex += 1
+        return
+      }
+
+      if (prefix === '-') {
+        if (sourceLines[sourceIndex] !== contentLine) {
+          throw new Error(`第 ${hunkIndex + 1} 个 diff hunk 的删除行与当前文件不匹配。`)
+        }
+        sourceIndex += 1
+        return
+      }
+
+      if (prefix === '+') {
+        result.push(contentLine)
+      }
+    })
+  })
+
+  while (sourceIndex < sourceLines.length) {
+    result.push(sourceLines[sourceIndex])
+    sourceIndex += 1
+  }
+
+  return result.join('\n')
+}
+
+function countOccurrences(source: string, needle: string): number {
+  if (!needle) return 0
+
+  let count = 0
+  let index = 0
+  while (index <= source.length) {
+    const nextIndex = source.indexOf(needle, index)
+    if (nextIndex === -1) break
+    count += 1
+    index = nextIndex + needle.length
+  }
+  return count
+}
+
+function applySearchReplaceBlocks(source: string, patches: SearchReplaceBlock[]): string {
+  let nextSource = source
+
+  patches.forEach((patch, index) => {
+    const occurrences = countOccurrences(nextSource, patch.search)
+    if (occurrences === 0) {
+      throw new Error(`第 ${index + 1} 个补丁的 SEARCH 块未在当前文件中找到。`)
+    }
+    if (occurrences > 1) {
+      throw new Error(`第 ${index + 1} 个补丁的 SEARCH 块在当前文件中出现了多次，无法安全应用。`)
+    }
+    nextSource = nextSource.replace(patch.search, patch.replace)
+  })
+
+  return nextSource
 }
 
 function buildLineDiff(previousText: string, nextText: string): DiffLine[] {
@@ -558,8 +713,11 @@ export function AISidebar({
                 `${getCurrentCodeDocument()}\n\n` +
                 `回复要求：\n` +
                 `1. 先用 2-4 条简短 bullet 说明你的修改计划或改动点。\n` +
-                `2. 然后提供一个完整的最终文件代码块，使用三反引号包裹。\n` +
-                `3. 如果当前引用不足以完成修改，要明确指出缺失信息。`
+                `2. 优先提供一个或多个 SEARCH/REPLACE 修改块，格式必须严格如下：\n` +
+                `<<<<<<< SEARCH\n原代码\n=======\n新代码\n>>>>>>> REPLACE\n` +
+                `3. 如果更适合，也可以提供一个 \`\`\`diff fenced code block，使用 unified diff hunk 格式。\n` +
+                `4. 如果改动范围很大，再额外提供一个完整的最终文件代码块，使用三反引号包裹。\n` +
+                `5. 如果当前引用不足以完成修改，要明确指出缺失信息。`
             }
           ]
         : editorMode === 'code' && interactionMode === 'edit'
@@ -638,7 +796,14 @@ export function AISidebar({
               )
             )
           }
-          if (isAgentRun && extractCodeBlocks(finalResponse)[0]) {
+          if (
+            isAgentRun &&
+            (
+              extractCodeBlocks(finalResponse)[0] ||
+              extractSearchReplaceBlocks(finalResponse).length > 0 ||
+              extractUnifiedDiff(finalResponse)
+            )
+          ) {
             setOpenDiffMessageKey(assistantMessageId)
           }
         } else if (agentRunId) {
@@ -799,6 +964,82 @@ export function AISidebar({
       selection: { anchor: 0 }
     })
     codeView.focus()
+  }
+
+  const handleApplyPatch = async (runId: string, patches: SearchReplaceBlock[]): Promise<void> => {
+    if (!patches.length || editorMode !== 'code') return
+
+    const codeView = getCodeEditorView()
+    if (!codeView) return
+
+    try {
+      const currentDocument = codeView.state.doc.toString()
+      const nextDocument = applySearchReplaceBlocks(currentDocument, patches)
+      handleReplaceWholeFile(nextDocument)
+      setAgentRuns((prev) =>
+        prev.map((run) =>
+          run.id === runId
+            ? {
+                ...run,
+                status: 'checking',
+                output: undefined
+              }
+            : run
+        )
+      )
+      await runProposalTypecheck(runId)
+    } catch (error) {
+      const output = error instanceof Error ? error.message : '补丁应用失败'
+      setAgentRuns((prev) =>
+        prev.map((run) =>
+          run.id === runId
+            ? {
+                ...run,
+                status: 'failed',
+                output
+              }
+            : run
+        )
+      )
+    }
+  }
+
+  const handleApplyUnifiedDiff = async (runId: string, diffText: string): Promise<void> => {
+    if (!diffText.trim() || editorMode !== 'code') return
+
+    const codeView = getCodeEditorView()
+    if (!codeView) return
+
+    try {
+      const currentDocument = codeView.state.doc.toString()
+      const nextDocument = applyUnifiedDiff(currentDocument, diffText)
+      handleReplaceWholeFile(nextDocument)
+      setAgentRuns((prev) =>
+        prev.map((run) =>
+          run.id === runId
+            ? {
+                ...run,
+                status: 'checking',
+                output: undefined
+              }
+            : run
+        )
+      )
+      await runProposalTypecheck(runId)
+    } catch (error) {
+      const output = error instanceof Error ? error.message : 'diff 应用失败'
+      setAgentRuns((prev) =>
+        prev.map((run) =>
+          run.id === runId
+            ? {
+                ...run,
+                status: 'failed',
+                output
+              }
+            : run
+        )
+      )
+    }
   }
 
   const runProposalTypecheck = async (runId: string): Promise<void> => {
@@ -1032,8 +1273,34 @@ export function AISidebar({
               : undefined
             const agentParts = proposalMessage ? parseAgentResponse(proposalMessage.content) : null
             const diffSourceDocument = proposalMessage?.sourceDocument ?? getCurrentCodeDocument()
+            const patchPreviewDocument =
+              agentParts?.patches.length
+                ? (() => {
+                    try {
+                      return applySearchReplaceBlocks(diffSourceDocument, agentParts.patches)
+                    } catch {
+                      return ''
+                    }
+                  })()
+                : ''
+            const unifiedDiffPreviewDocument =
+              agentParts?.unifiedDiff
+                ? (() => {
+                    try {
+                      return applyUnifiedDiff(diffSourceDocument, agentParts.unifiedDiff)
+                    } catch {
+                      return ''
+                    }
+                  })()
+                : ''
             const codeDiff =
-              agentParts?.code ? buildLineDiff(diffSourceDocument, agentParts.code) : []
+              patchPreviewDocument
+                ? buildLineDiff(diffSourceDocument, patchPreviewDocument)
+                : unifiedDiffPreviewDocument
+                  ? buildLineDiff(diffSourceDocument, unifiedDiffPreviewDocument)
+                : agentParts?.code
+                  ? buildLineDiff(diffSourceDocument, agentParts.code)
+                  : []
             const hasCodeDiff = codeDiff.some((line) => line.type !== 'context')
             const proposalMessageIndex = proposalMessage
               ? messages.findIndex((item) => item.id === proposalMessage.id)
@@ -1215,15 +1482,44 @@ export function AISidebar({
                   </div>
                 ) : null}
 
-                {proposalMessage && agentParts?.code ? (
+                {proposalMessage &&
+                (agentParts?.code || agentParts?.patches.length || agentParts?.unifiedDiff) ? (
                   <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+                    {agentParts.patches.length ? (
+                      <Button
+                        size="sm"
+                        className="h-8"
+                        onClick={() => {
+                          void handleApplyPatch(run.id, agentParts.patches)
+                        }}
+                        disabled={!canApplyToCodeEditor || run.status === 'checking' || !patchPreviewDocument}
+                      >
+                        <Replace className="size-3.5" />
+                        应用补丁
+                      </Button>
+                    ) : null}
+                    {agentParts.unifiedDiff ? (
+                      <Button
+                        size="sm"
+                        className="h-8"
+                        onClick={() => {
+                          void handleApplyUnifiedDiff(run.id, agentParts.unifiedDiff)
+                        }}
+                        disabled={
+                          !canApplyToCodeEditor || run.status === 'checking' || !unifiedDiffPreviewDocument
+                        }
+                      >
+                        <CodeXml className="size-3.5" />
+                        应用 Diff
+                      </Button>
+                    ) : null}
                     <Button
                       size="sm"
                       className="h-8"
                       onClick={() => {
                         void handleApplyProposal(run.id, agentParts.code)
                       }}
-                      disabled={!canApplyToCodeEditor || run.status === 'checking'}
+                      disabled={!canApplyToCodeEditor || run.status === 'checking' || !agentParts.code}
                     >
                       <FilePenLine className="size-3.5" />
                       应用整个文件
@@ -1297,6 +1593,69 @@ export function AISidebar({
                         </pre>
                       </ScrollArea>
                     ) : null}
+                  </div>
+                ) : null}
+
+                {proposalMessage && agentParts?.patches.length ? (
+                  <div className="border-b px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Patch 提案
+                      </p>
+                      <span className="rounded-full border bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground">
+                        {agentParts.patches.length} blocks
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {agentParts.patches.slice(0, 3).map((patch, patchIndex) => (
+                        <div key={`${run.id}-patch-${patchIndex}`} className="rounded-lg border bg-muted/15 p-3">
+                          <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Patch {patchIndex + 1}
+                          </div>
+                          <div className="grid gap-2 md:grid-cols-2">
+                            <div className="rounded-md bg-rose-500/8 p-2">
+                              <div className="mb-1 text-[10px] uppercase tracking-wide text-rose-600 dark:text-rose-300">
+                                Search
+                              </div>
+                              <pre className="whitespace-pre-wrap font-mono text-[11px] leading-5 text-muted-foreground">
+                                {patch.search}
+                              </pre>
+                            </div>
+                            <div className="rounded-md bg-emerald-500/8 p-2">
+                              <div className="mb-1 text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
+                                Replace
+                              </div>
+                              <pre className="whitespace-pre-wrap font-mono text-[11px] leading-5 text-muted-foreground">
+                                {patch.replace}
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {agentParts.patches.length > 3 ? (
+                        <p className="text-xs text-muted-foreground">
+                          仅预览前 3 个 patch，实际应用时会按全部 patch 执行。
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                {proposalMessage && agentParts?.unifiedDiff ? (
+                  <div className="border-b px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Unified Diff
+                      </p>
+                      <span className="rounded-full border bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground">
+                        Hunk
+                      </span>
+                    </div>
+                    <ScrollArea className="mt-2 max-h-[220px]" orientation="both">
+                      <pre className="rounded-lg border bg-muted/15 p-3 font-mono text-[11px] leading-5 text-muted-foreground">
+                        {agentParts.unifiedDiff}
+                      </pre>
+                    </ScrollArea>
                   </div>
                 ) : null}
 
