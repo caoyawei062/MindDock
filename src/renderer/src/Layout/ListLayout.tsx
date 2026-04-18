@@ -20,7 +20,7 @@ const ListLayout: React.FC = () => {
           <Search />
         </div>
         {/* 使用 overlayscrollbars 方案（带动画） */}
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <List />
         </ScrollArea>
         {/* 使用纯 CSS 方案（无动画）- 取消注释对比 */}

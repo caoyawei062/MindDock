@@ -6,29 +6,44 @@ import { useList } from '@renderer/provider/ListProvider'
 
 const Search: React.FC = () => {
   const { createNote, filterType, setFilterType, searchQuery, setSearchQuery, filteredNotes } = useList()
+  const searchInputRef = React.useRef<HTMLInputElement>(null)
 
-  const handleCreateDocument = async () => {
+  const handleCreateDocument = React.useCallback(async () => {
     if (filterType !== 'all' && filterType !== 'document') {
       setFilterType('document')
     }
     await createNote({ type: 'document', title: '' })
-  }
+  }, [createNote, filterType, setFilterType])
 
-  const handleCreateSnippet = async () => {
+  const handleCreateSnippet = React.useCallback(async () => {
     if (filterType !== 'all' && filterType !== 'snippet') {
       setFilterType('snippet')
     }
     await createNote({ type: 'snippet', title: '', language: 'javascript' })
-  }
+  }, [createNote, filterType, setFilterType])
 
   const clearSearch = () => {
     setSearchQuery('')
   }
 
+  React.useEffect(() => {
+    return window.api.onAppCommand((command) => {
+      if (command === 'new-document') {
+        void handleCreateDocument()
+      }
+
+      if (command === 'focus-search') {
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      }
+    })
+  }, [handleCreateDocument])
+
   return (
     <div className="p-3 border-b dark:border-border-dark drag">
       <InputGroup>
         <InputGroupInput
+          ref={searchInputRef}
           placeholder="搜索标题、内容或标签..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}

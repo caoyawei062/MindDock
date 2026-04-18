@@ -30,11 +30,12 @@ const WelcomeView: React.FC = () => {
             {/* Logo 和标题 */}
             <div className="flex flex-col items-center mb-12">
                 <div className="relative mb-6">
-                    <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
+                    <div className="absolute inset-0 rounded-full bg-primary/12 blur-2xl dark:bg-primary/20" />
+                    <div className="absolute inset-2 rounded-[1.6rem] bg-black/8 blur-xl dark:bg-black/25" />
                     <img
                         src={logoSrc}
                         alt="MindDock Logo"
-                        className="relative size-20 rounded-2xl shadow-lg"
+                        className="relative size-20 rounded-3xl ring-1 ring-black/6 shadow-[0_14px_28px_rgba(15,23,42,0.12),0_4px_10px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.72)] dark:ring-white/8 dark:shadow-[0_14px_30px_rgba(0,0,0,0.34),0_4px_12px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.22)]"
                     />
                 </div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-2">

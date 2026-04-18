@@ -19,6 +19,7 @@ type SDKMessage = NonNullable<Parameters<typeof streamText>[0]['messages']>[numb
  */
 export class AIService {
   private static instance: AIService
+  private activeStreams = new Map<string, AbortController>()
 
   private constructor() {
     // Singleton
@@ -102,6 +103,7 @@ export class AIService {
    * 流式生成文本
    */
   async streamCompletion(
+    sessionId: string,
     modelId: string,
     messages: AIMessage[],
     options: Partial<AICompletionOptions> = {},
@@ -120,6 +122,8 @@ export class AIService {
 
     const model = this.createModel(config)
     const convertedMessages = this.convertMessages(messages)
+    const abortController = new AbortController()
+    this.activeStreams.set(sessionId, abortController)
 
     try {
       const result = await streamText({
@@ -127,7 +131,8 @@ export class AIService {
         messages: convertedMessages,
         temperature: options.temperature ?? 0.7,
         topP: options.topP,
-        maxOutputTokens: options.maxTokens
+        maxOutputTokens: options.maxTokens,
+        abortSignal: abortController.signal
       })
 
       for await (const chunk of result.textStream) {
@@ -141,7 +146,19 @@ export class AIService {
     } catch (error) {
       console.error('AI streaming error:', error)
       throw error
+    } finally {
+      this.activeStreams.delete(sessionId)
     }
+  }
+
+  cancelStream(sessionId: string): boolean {
+    const controller = this.activeStreams.get(sessionId)
+    if (!controller) {
+      return false
+    }
+    controller.abort()
+    this.activeStreams.delete(sessionId)
+    return true
   }
 
   /**

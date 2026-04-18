@@ -94,7 +94,9 @@ function runMigrations(database: Database.Database): void {
   const migrations = [
     { name: '001_initial', sql: migration001Initial },
     { name: '002_add_fts', sql: migration002AddFts },
-    { name: '003_add_ai_configs', sql: migration003AddAiConfigs }
+    { name: '003_add_ai_configs', sql: migration003AddAiConfigs },
+    { name: '004_add_ai_tasks', sql: migration004AddAiTasks },
+    { name: '005_ai_tasks_add_note_id', sql: migration005AiTasksAddNoteId }
   ]
 
   const executedMigrations = (
@@ -234,6 +236,71 @@ CREATE TABLE IF NOT EXISTS ai_configs (
 
 CREATE INDEX IF NOT EXISTS idx_ai_configs_provider ON ai_configs(provider);
 CREATE INDEX IF NOT EXISTS idx_ai_configs_enabled ON ai_configs(enabled);
+`
+
+const migration004AddAiTasks = `
+CREATE TABLE IF NOT EXISTS ai_tasks (
+  id            TEXT PRIMARY KEY,
+  title         TEXT NOT NULL,
+  goal          TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'idle',
+  mode          TEXT NOT NULL DEFAULT 'one_shot',
+  summary       TEXT DEFAULT NULL,
+  model_id      TEXT DEFAULT NULL,
+  error_message TEXT DEFAULT NULL,
+  last_run_at   TEXT DEFAULT NULL,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_tasks_updated ON ai_tasks(updated_at);
+CREATE INDEX IF NOT EXISTS idx_ai_tasks_status ON ai_tasks(status);
+
+CREATE TABLE IF NOT EXISTS ai_task_sources (
+  id               TEXT PRIMARY KEY,
+  task_id          TEXT NOT NULL,
+  source_type      TEXT NOT NULL,
+  source_id        TEXT DEFAULT NULL,
+  role             TEXT NOT NULL,
+  label            TEXT DEFAULT NULL,
+  content_snapshot TEXT DEFAULT NULL,
+  created_at       TEXT NOT NULL,
+
+  FOREIGN KEY (task_id) REFERENCES ai_tasks(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_task_sources_task ON ai_task_sources(task_id);
+CREATE INDEX IF NOT EXISTS idx_ai_task_sources_source ON ai_task_sources(source_id);
+
+CREATE TABLE IF NOT EXISTS ai_task_outputs (
+  id          TEXT PRIMARY KEY,
+  task_id     TEXT NOT NULL,
+  output_type TEXT NOT NULL,
+  title       TEXT DEFAULT NULL,
+  content     TEXT NOT NULL,
+  meta_json   TEXT DEFAULT NULL,
+  status      TEXT NOT NULL DEFAULT 'draft',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+
+  FOREIGN KEY (task_id) REFERENCES ai_tasks(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_task_outputs_task ON ai_task_outputs(task_id);
+CREATE INDEX IF NOT EXISTS idx_ai_task_outputs_status ON ai_task_outputs(status);
+`
+
+const migration005AiTasksAddNoteId = `
+-- 添加 note_id 列用于直接关联笔记
+ALTER TABLE ai_tasks ADD COLUMN note_id TEXT DEFAULT NULL REFERENCES notes(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_ai_tasks_note_id ON ai_tasks(note_id);
+
+-- 从现有 sources 回填 note_id（取 primary 角色的 source_id）
+UPDATE ai_tasks SET note_id = (
+  SELECT s.source_id FROM ai_task_sources s
+  WHERE s.task_id = ai_tasks.id AND s.role = 'primary' AND s.source_id IS NOT NULL
+  LIMIT 1
+);
 `
 
 export default {

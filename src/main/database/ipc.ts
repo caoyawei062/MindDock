@@ -2,6 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from 'electron'
 import * as fs from 'fs/promises'
 import {
   getAllNotes,
+  getAllNotesWithTags,
   getNoteById,
   createNote,
   updateNote,
@@ -9,23 +10,13 @@ import {
   restoreNote,
   deleteNote,
   getTrashedNotes,
+  getTrashedNotesWithTags,
   searchNotes,
   togglePinNote,
   getSnippetsForTray,
   CreateNoteParams,
   UpdateNoteParams
 } from './notes'
-// import {  // 暂时禁用文件夹功能
-//   getAllFolders,
-//   getFolderTree,
-//   getFolderById,
-//   createFolder,
-//   updateFolder,
-//   deleteFolder,
-//   toggleFolderExpanded,
-//   CreateFolderParams,
-//   UpdateFolderParams
-// } from './folders'
 import {
   getAllExports,
   createExportRecord,
@@ -54,8 +45,64 @@ import {
   toggleAIConfig,
   deleteAIConfig
 } from './ai-configs'
+import {
+  acceptAITaskOutput,
+  createAITask,
+  deleteAITask,
+  getAllAITasks,
+  getAITaskById,
+  getAITaskOutputs,
+  getAITaskSources,
+  replaceAITaskOutputs,
+  replaceAITaskSources,
+  updateAITask,
+  type CreateAITaskOutputParams,
+  type CreateAITaskParams,
+  type CreateAITaskSourceParams,
+  type UpdateAITaskParams
+} from './ai-tasks'
 import { contentToHTML } from '../export/pdf'
+import { createDocxFromHtml, normalizeHtmlToMarkdown } from '../export/document'
 import { AIModelConfig, AIProvider } from '../ai/types'
+
+const LANGUAGE_FILE_EXTENSIONS: Record<string, string> = {
+  javascript: 'js',
+  typescript: 'ts',
+  python: 'py',
+  java: 'java',
+  csharp: 'cs',
+  cpp: 'cpp',
+  c: 'c',
+  go: 'go',
+  rust: 'rs',
+  ruby: 'rb',
+  php: 'php',
+  html: 'html',
+  css: 'css',
+  json: 'json',
+  markdown: 'md',
+  shell: 'sh',
+  bash: 'sh',
+  zsh: 'zsh',
+  sql: 'sql',
+  yaml: 'yml',
+  yml: 'yml',
+  xml: 'xml',
+  text: 'txt',
+  plaintext: 'txt'
+}
+
+function getSnippetFileExtension(language: string | null): string {
+  if (!language) return 'txt'
+  return LANGUAGE_FILE_EXTENSIONS[language.toLowerCase()] || language.toLowerCase()
+}
+
+function sanitizeFileName(name: string): string {
+  return (name || 'untitled')
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+    .replace(/\s+/g, ' ')
+}
 
 /**
  * 注册数据库相关的 IPC 处理器
@@ -64,6 +111,19 @@ export function registerDatabaseIPC(): void {
   // 获取所有笔记
   ipcMain.handle('db:notes:getAll', (_, type?: 'document' | 'snippet', folderId?: string) => {
     return getAllNotes(type, folderId)
+  })
+
+  // 获取所有笔记（带标签，单次查询）
+  ipcMain.handle(
+    'db:notes:getAllWithTags',
+    (_, type?: 'document' | 'snippet', folderId?: string) => {
+      return getAllNotesWithTags(type, folderId)
+    }
+  )
+
+  // 获取回收站笔记（带标签）
+  ipcMain.handle('db:notes:getTrashedWithTags', () => {
+    return getTrashedNotesWithTags()
   })
 
   // 根据 ID 获取笔记
@@ -115,44 +175,6 @@ export function registerDatabaseIPC(): void {
   ipcMain.handle('db:snippets:getForTray', () => {
     return getSnippetsForTray()
   })
-
-  // ========== 文件夹操作 (暂时禁用) ==========
-  /*
-  // 获取所有文件夹
-  ipcMain.handle('db:folders:getAll', () => {
-    return getAllFolders()
-  })
-
-  // 获取文件夹树
-  ipcMain.handle('db:folders:getTree', () => {
-    return getFolderTree()
-  })
-
-  // 根据 ID 获取文件夹
-  ipcMain.handle('db:folders:getById', (_, id: string) => {
-    return getFolderById(id)
-  })
-
-  // 创建文件夹
-  ipcMain.handle('db:folders:create', (_, params: CreateFolderParams) => {
-    return createFolder(params)
-  })
-
-  // 更新文件夹
-  ipcMain.handle('db:folders:update', (_, id: string, params: UpdateFolderParams) => {
-    return updateFolder(id, params)
-  })
-
-  // 删除文件夹
-  ipcMain.handle('db:folders:delete', (_, id: string) => {
-    return deleteFolder(id)
-  })
-
-  // 切换文件夹展开状态
-  ipcMain.handle('db:folders:toggleExpanded', (_, id: string) => {
-    return toggleFolderExpanded(id)
-  })
-  */
 
   // ========== 导出操作 ==========
 
@@ -276,8 +298,10 @@ export function registerDatabaseIPC(): void {
       // 加载 HTML
       await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
 
-      // 等待页面完全加载
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // 等待页面渲染完成（loadURL 已等待 did-finish-load，这里再等一帧确保布局完成）
+      await win.webContents.executeJavaScript(
+        'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'
+      )
 
       // 截图
       const image = await win.webContents.capturePage()
@@ -336,8 +360,7 @@ export function registerDatabaseIPC(): void {
       const language = note.language || 'text'
       markdown += `\`\`\`${language}\n${note.content}\n\`\`\`\n`
     } else {
-      // 富文本文档直接导出内容
-      markdown += `${note.content}\n`
+      markdown += `${normalizeHtmlToMarkdown(note.content)}\n`
     }
 
     // 写入文件
@@ -352,6 +375,84 @@ export function registerDatabaseIPC(): void {
     })
 
     // 清理旧记录（每个笔记只保留最近5条）
+    cleanOldExports(noteId, 5)
+
+    return exportRecord
+  })
+
+  // 导出文档到 Word
+  ipcMain.handle('db:export:docx', async (_event, noteId: string) => {
+    const note = getNoteById(noteId)
+    if (!note) {
+      throw new Error('Note not found')
+    }
+
+    if (note.type !== 'document') {
+      throw new Error('Word export is only supported for documents')
+    }
+
+    const result = await dialog.showSaveDialog({
+      defaultPath: `${sanitizeFileName(note.title)}.docx`,
+      filters: [
+        { name: 'Word Documents', extensions: ['docx'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return null
+    }
+
+    const html = contentToHTML(note.title, note.content)
+    await createDocxFromHtml(html, result.filePath)
+
+    const exportRecord = createExportRecord({
+      noteId: note.id,
+      noteTitle: note.title,
+      filePath: result.filePath,
+      exportType: 'docx'
+    })
+
+    cleanOldExports(noteId, 5)
+
+    return exportRecord
+  })
+
+  // 导出代码片段到源代码文件
+  ipcMain.handle('db:export:code', async (_event, noteId: string) => {
+    const note = getNoteById(noteId)
+    if (!note) {
+      throw new Error('Note not found')
+    }
+
+    if (note.type !== 'snippet') {
+      throw new Error('Code file export is only supported for snippets')
+    }
+
+    const extension = getSnippetFileExtension(note.language)
+    const safeTitle = sanitizeFileName(note.title)
+
+    const result = await dialog.showSaveDialog({
+      defaultPath: `${safeTitle}.${extension}`,
+      filters: [
+        { name: `${(note.language || 'Code').toUpperCase()} Files`, extensions: [extension] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return null
+    }
+
+    await fs.writeFile(result.filePath, note.content, 'utf8')
+
+    const exportRecord = createExportRecord({
+      noteId: note.id,
+      noteTitle: note.title,
+      filePath: result.filePath,
+      exportType: 'code'
+    })
+
     cleanOldExports(noteId, 5)
 
     return exportRecord
@@ -413,6 +514,63 @@ export function registerDatabaseIPC(): void {
   ipcMain.handle('db:tags:getNoteIds', (_, tagId: string) => {
     return getNoteIdsByTagId(tagId)
   })
+
+  // ========== AI 任务操作 ==========
+
+  ipcMain.handle('db:aiTasks:getAll', (_, sourceId?: string) => {
+    return getAllAITasks(sourceId)
+  })
+
+  ipcMain.handle('db:aiTasks:getById', (_, id: string) => {
+    return getAITaskById(id)
+  })
+
+  ipcMain.handle('db:aiTasks:create', (_, params: CreateAITaskParams) => {
+    return createAITask(params)
+  })
+
+  ipcMain.handle('db:aiTasks:update', (_, id: string, params: UpdateAITaskParams) => {
+    return updateAITask(id, params)
+  })
+
+  ipcMain.handle('db:aiTasks:delete', (_, id: string) => {
+    return deleteAITask(id)
+  })
+
+  ipcMain.handle('db:aiTaskSources:get', (_, taskId: string) => {
+    return getAITaskSources(taskId)
+  })
+
+  ipcMain.handle(
+    'db:aiTaskSources:replace',
+    (_, taskId: string, sources: CreateAITaskSourceParams[]) => {
+      return replaceAITaskSources(taskId, sources)
+    }
+  )
+
+  ipcMain.handle('db:aiTaskOutputs:get', (_, taskId: string) => {
+    return getAITaskOutputs(taskId)
+  })
+
+  ipcMain.handle(
+    'db:aiTaskOutputs:replace',
+    (_, taskId: string, outputs: CreateAITaskOutputParams[]) => {
+      return replaceAITaskOutputs(taskId, outputs)
+    }
+  )
+
+  ipcMain.handle(
+    'db:aiTaskOutputs:accept',
+    (
+      _,
+      taskId: string,
+      outputId: string,
+      target: 'new_note' | 'append_current' | 'new_snippet',
+      noteId?: string
+    ) => {
+      return acceptAITaskOutput(taskId, outputId, target, noteId)
+    }
+  )
 
   // ========== AI 配置操作 ==========
 

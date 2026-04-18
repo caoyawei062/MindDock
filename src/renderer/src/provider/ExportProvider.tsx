@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 
 export interface ExportRecord {
   id: string
   note_id: string
   note_title: string
   file_path: string
-  export_type: 'markdown' | 'html' | 'pdf' | 'image'
+  export_type: 'markdown' | 'html' | 'pdf' | 'image' | 'code' | 'docx'
   created_at: string
 }
 
@@ -13,9 +13,12 @@ interface ExportContextType {
   exports: ExportRecord[]
   isLoading: boolean
   loadExports: () => Promise<void>
+  ensureLoaded: () => Promise<void>
   exportToPDF: (noteId: string) => Promise<ExportRecord | null>
   exportToImage: (noteId: string) => Promise<ExportRecord | null>
   exportToMarkdown: (noteId: string) => Promise<ExportRecord | null>
+  exportToDocx: (noteId: string) => Promise<ExportRecord | null>
+  exportToCode: (noteId: string) => Promise<ExportRecord | null>
   deleteExport: (id: string) => Promise<boolean>
 }
 
@@ -24,19 +27,28 @@ const ExportContext = createContext<ExportContextType | undefined>(undefined)
 export const ExportProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [exports, setExports] = useState<ExportRecord[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const hasLoadedRef = useRef(false)
 
-  // 加载导出记录
+  // 加载导出记录（懒加载：首次调用时才从数据库读取）
   const loadExports = useCallback(async () => {
     try {
       setIsLoading(true)
-      const exportsData = await window.api.exportsGetAll(10) // 只加载最近10条
+      const exportsData = await window.api.exportsGetAll(10)
       setExports(exportsData)
+      hasLoadedRef.current = true
     } catch (error) {
       console.error('Failed to load exports:', error)
     } finally {
       setIsLoading(false)
     }
   }, [])
+
+  // 按需加载：如果还没加载过，触发首次加载
+  const ensureLoaded = useCallback(async () => {
+    if (!hasLoadedRef.current) {
+      await loadExports()
+    }
+  }, [loadExports])
 
   // 导出笔记到 PDF
   const exportToPDF = useCallback(async (noteId: string): Promise<ExportRecord | null> => {
@@ -86,6 +98,34 @@ export const ExportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [loadExports])
 
+  const exportToDocx = useCallback(async (noteId: string): Promise<ExportRecord | null> => {
+    try {
+      const result = await window.api.exportDocx(noteId)
+      if (result) {
+        await loadExports()
+        return result
+      }
+      return null
+    } catch (error) {
+      console.error('Failed to export note to Word:', error)
+      return null
+    }
+  }, [loadExports])
+
+  const exportToCode = useCallback(async (noteId: string): Promise<ExportRecord | null> => {
+    try {
+      const result = await window.api.exportCode(noteId)
+      if (result) {
+        await loadExports()
+        return result
+      }
+      return null
+    } catch (error) {
+      console.error('Failed to export code snippet:', error)
+      return null
+    }
+  }, [loadExports])
+
   // 删除导出记录
   const deleteExport = useCallback(async (id: string): Promise<boolean> => {
     try {
@@ -101,18 +141,16 @@ export const ExportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [])
 
-  // 初始化时加载导出记录
-  useEffect(() => {
-    loadExports()
-  }, [loadExports])
-
   const value: ExportContextType = {
     exports,
     isLoading,
     loadExports,
+    ensureLoaded,
     exportToPDF,
     exportToImage,
     exportToMarkdown,
+    exportToDocx,
+    exportToCode,
     deleteExport
   }
 

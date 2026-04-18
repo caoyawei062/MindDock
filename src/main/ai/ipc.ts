@@ -17,6 +17,7 @@ export const AI_IPC_CHANNELS = {
 
   // AI 功能
   STREAM_COMPLETION: 'ai:completion:stream',
+  CANCEL_STREAM: 'ai:completion:cancel',
   GENERATE_COMPLETION: 'ai:completion:generate',
   TEST_MODEL: 'ai:model:test'
 } as const
@@ -71,6 +72,7 @@ export function registerAIIPC(): void {
     ) => {
       try {
         await aiService.streamCompletion(
+          sessionId,
           modelId,
           messages,
           options,
@@ -89,6 +91,10 @@ export function registerAIIPC(): void {
       }
     }
   )
+
+  ipcMain.handle(AI_IPC_CHANNELS.CANCEL_STREAM, (_event, sessionId: string) => {
+    return { success: aiService.cancelStream(sessionId) }
+  })
 
   // 一次性生成文本
   ipcMain.handle(

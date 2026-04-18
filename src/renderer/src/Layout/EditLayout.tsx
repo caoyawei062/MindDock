@@ -9,7 +9,7 @@ import { useNoteEditor } from '@renderer/hooks/useNoteEditor'
 import { cn } from '@/lib/utils'
 import { ChartNoAxesGantt } from 'lucide-react'
 import { DEFAULT_LANGUAGES } from '../components/business/Edit/types'
-import { AISidebar } from '@renderer/components/business/AI'
+import { AITaskSidebar } from '@renderer/components/business/AI'
 
 // 窄屏阈值（像素）
 const NARROW_THRESHOLD = 500
@@ -17,7 +17,9 @@ const NARROW_THRESHOLD = 500
 const EditLayout = (): React.JSX.Element => {
   const {
     outlineOpen,
+    setOutlineOpen,
     outlineItems,
+    updateOutlineItems,
     editor,
     aiPanelOpen,
     setCodeSelectionText,
@@ -37,7 +39,10 @@ const EditLayout = (): React.JSX.Element => {
     codeMirrorConfig,
     setCodeMirrorConfig,
     tags,
-    setTags
+    setTags,
+    isDirty,
+    isSaving,
+    saveNote
   } = useNoteEditor({ editor })
 
   const [containerWidth, setContainerWidth] = useState(0)
@@ -65,7 +70,26 @@ const EditLayout = (): React.JSX.Element => {
       clearCodeSelectionText()
       setCodeEditorView(null)
     }
-  }, [editorMode, clearCodeSelectionText, setCodeEditorView])
+    // 切换到 code 模式时关闭大纲
+    if (editorMode === 'code') {
+      setOutlineOpen(false)
+    }
+  }, [editorMode, clearCodeSelectionText, setCodeEditorView, setOutlineOpen])
+
+  // 切换文档时刷新大纲（setContent 使用 emitUpdate: false，不会触发 onUpdate）
+  React.useEffect(() => {
+    if (note?.id && editor) {
+      updateOutlineItems()
+    }
+  }, [note?.id, editor, updateOutlineItems])
+
+  React.useEffect(() => {
+    return window.api.onAppCommand((command) => {
+      if (command === 'save-current-note') {
+        void saveNote()
+      }
+    })
+  }, [saveNote])
 
   // 处理 AI 侧边栏拖拽
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -121,6 +145,9 @@ const EditLayout = (): React.JSX.Element => {
       <EditToolHeader
         title={title}
         onTitleChange={setTitle}
+        onSave={() => {
+          void saveNote()
+        }}
         mode={editorMode}
         onModeChange={setEditorMode}
         languages={DEFAULT_LANGUAGES}
@@ -133,6 +160,8 @@ const EditLayout = (): React.JSX.Element => {
         noteId={note?.id}
         noteContent={editorMode === 'word' ? editor?.getHTML() || '' : codeContent}
         noteType={note?.type}
+        isDirty={isDirty}
+        isSaving={isSaving}
       />
       <div className="flex-1 flex overflow-hidden relative">
         {/* 大纲视图 - 宽屏内嵌 */}
@@ -217,7 +246,7 @@ const EditLayout = (): React.JSX.Element => {
 
             {/* 侧边栏 */}
             <div className="shrink-0 overflow-hidden" style={{ width: `${aiSidebarWidth}px` }}>
-              <AISidebar className="h-full" editorMode={editorMode} />
+              <AITaskSidebar className="h-full" editorMode={editorMode} />
             </div>
           </>
         )}

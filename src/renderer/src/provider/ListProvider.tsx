@@ -1,5 +1,14 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
-// import { useFolder } from './FolderProvider' // 暂时禁用文件夹功能
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from '@renderer/components/ui/dialog'
+import { Button } from '@renderer/components/ui/button'
+
 
 // 标签类型定义
 export interface Tag {
@@ -38,6 +47,11 @@ export interface RecentViewItem {
     type: 'document' | 'snippet'
 }
 
+interface UnsavedChangesGuard {
+    hasUnsavedChanges: () => boolean
+    saveChanges: () => Promise<void>
+}
+
 interface ListContextType {
     // 当前筛选类型
     filterType: FilterType
@@ -55,6 +69,7 @@ interface ListContextType {
     // 当前选中的笔记
     selectedNote: Note | null
     setSelectedNote: (note: Note | null) => void
+    registerUnsavedChangesGuard: (guard: UnsavedChangesGuard | null) => void
 
     // 最近查看
     recentViews: RecentViewItem[]
@@ -87,6 +102,9 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [notes, setNotes] = useState<Note[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [selectedNote, setSelectedNoteInternal] = useState<Note | null>(null)
+    const selectedNoteRef = useRef<Note | null>(null)
+    const [switchConfirmOpen, setSwitchConfirmOpen] = useState(false)
+    const [pendingSelection, setPendingSelection] = useState<{ note: Note | null } | null>(null)
     const [recentViews, setRecentViews] = useState<RecentViewItem[]>(() => {
         // 从 localStorage 加载最近查看记录
         try {
@@ -96,8 +114,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return []
         }
     })
-    // const { selectedFolder } = useFolder() // 暂时禁用文件夹功能
-
+    const unsavedChangesGuardRef = useRef<UnsavedChangesGuard | null>(null)
     // 去除 HTML 标签的辅助函数
     const stripHtml = (html: string) => {
         return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
@@ -121,8 +138,12 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })
     }, [notes, searchQuery])
 
-    // 稳定的 setSelectedNote 引用，避免触发不必要的重渲染
-    const setSelectedNote = useCallback((note: Note | null) => {
+    const registerUnsavedChangesGuard = useCallback((guard: UnsavedChangesGuard | null) => {
+        unsavedChangesGuardRef.current = guard
+    }, [])
+
+    const commitSelectedNote = useCallback((note: Note | null) => {
+        selectedNoteRef.current = note
         setSelectedNoteInternal(note)
         // 更新最近查看记录（废纸篓中的笔记不添加）
         if (note && filterType !== 'trash') {
@@ -141,36 +162,71 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [filterType])
 
+    // 稳定引用 — 通过 ref 读取当前 selectedNote，避免闭包过时
+    const setSelectedNote = useCallback((note: Note | null) => {
+        const currentId = selectedNoteRef.current?.id ?? null
+        const nextId = note?.id ?? null
+
+        if (currentId === nextId) {
+            commitSelectedNote(note)
+            return
+        }
+
+        const guard = unsavedChangesGuardRef.current
+        if (guard?.hasUnsavedChanges()) {
+            setPendingSelection({ note })
+            setSwitchConfirmOpen(true)
+            return
+        }
+
+        commitSelectedNote(note)
+    }, [commitSelectedNote])
+
+    const closeSwitchConfirm = useCallback(() => {
+        setSwitchConfirmOpen(false)
+        setPendingSelection(null)
+    }, [])
+
+    const handleDiscardAndSwitch = useCallback(() => {
+        const target = pendingSelection?.note ?? null
+        commitSelectedNote(target)
+        closeSwitchConfirm()
+    }, [pendingSelection, commitSelectedNote, closeSwitchConfirm])
+
+    const handleSaveAndSwitch = useCallback(async () => {
+        const guard = unsavedChangesGuardRef.current
+        const target = pendingSelection?.note ?? null
+
+        if (!guard) {
+            commitSelectedNote(target)
+            closeSwitchConfirm()
+            return
+        }
+
+        await guard.saveChanges()
+        commitSelectedNote(target)
+        closeSwitchConfirm()
+    }, [pendingSelection, commitSelectedNote, closeSwitchConfirm])
+
     // 清空最近查看
     const clearRecentViews = useCallback(() => {
         setRecentViews([])
         localStorage.removeItem('minddock-recent-views')
     }, [])
 
-    // 加载笔记列表
+    // 加载笔记列表（批量加载标签，避免 N+1）
     const loadNotes = useCallback(async () => {
         setIsLoading(true)
         try {
-            let result: Note[] = []
+            let notesWithTags: Note[]
 
             if (filterType === 'trash') {
-                // 加载回收站
-                result = await window.api.notesGetTrashed()
+                notesWithTags = await window.api.notesGetTrashedWithTags()
             } else if (filterType === 'all') {
-                // 加载所有笔记
-                result = await window.api.notesGetAll(undefined, undefined)
+                notesWithTags = await window.api.notesGetAllWithTags(undefined, undefined)
             } else {
-                // 加载特定类型的笔记
-                result = await window.api.notesGetAll(filterType, undefined)
+                notesWithTags = await window.api.notesGetAllWithTags(filterType, undefined)
             }
-
-            // 为每个笔记加载标签
-            const notesWithTags = await Promise.all(
-                result.map(async (note) => {
-                    const tags = await window.api.tagsGetByNoteId(note.id)
-                    return { ...note, tags }
-                })
-            )
 
             setNotes(notesWithTags)
         } catch (error) {
@@ -215,11 +271,9 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const tags = await window.api.tagsGetByNoteId(id)
                 const updatedWithTags = { ...updated, tags }
 
-                // 更新列表中的数据（不重新加载整个列表，优化性能）
                 setNotes(prev => prev.map(n => n.id === id ? updatedWithTags : n))
-                // 如果是当前选中的笔记，也更新选中状态
-                if (selectedNote?.id === id) {
-                    setSelectedNote(updatedWithTags)
+                if (selectedNoteRef.current?.id === id) {
+                    commitSelectedNote(updatedWithTags)
                 }
             }
             return updated
@@ -227,34 +281,30 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Failed to update note:', error)
             return null
         }
-    }, [selectedNote])
+    }, [commitSelectedNote])
 
     // 更新笔记标签（同步到列表）
     const updateNoteTags = useCallback((id: string, tags: Tag[]) => {
         setNotes(prev => prev.map(n => n.id === id ? { ...n, tags } : n))
-        // 如果是当前选中的笔记，也更新选中状态
-        if (selectedNote?.id === id) {
-            setSelectedNote({ ...selectedNote, tags })
+        if (selectedNoteRef.current?.id === id) {
+            commitSelectedNote({ ...selectedNoteRef.current, tags })
         }
-    }, [selectedNote, setSelectedNote])
+    }, [commitSelectedNote])
 
     // 删除笔记（移到回收站或永久删除）
     const deleteNote = useCallback(async (id: string) => {
         try {
             let success: boolean
             if (filterType === 'trash') {
-                // 在回收站中永久删除
                 success = await window.api.notesDelete(id)
             } else {
-                // 移到回收站
                 success = await window.api.notesTrash(id)
             }
 
             if (success) {
                 await loadNotes()
-                // 如果删除的是当前选中的笔记，清除选中状态
-                if (selectedNote?.id === id) {
-                    setSelectedNote(null)
+                if (selectedNoteRef.current?.id === id) {
+                    commitSelectedNote(null)
                 }
             }
             return success
@@ -262,7 +312,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Failed to delete note:', error)
             return false
         }
-    }, [filterType, loadNotes, selectedNote])
+    }, [filterType, loadNotes, commitSelectedNote])
 
     // 恢复笔记（从回收站恢复）
     const restoreNote = useCallback(async (id: string) => {
@@ -278,7 +328,8 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [loadNotes])
 
-    // 将选中状态分离，减少不必要的重渲染
+    // setSelectedNote/updateNote/deleteNote 等现在通过 ref 读取 selectedNote，
+    // 不再依赖 selectedNote 状态，所以 stableValue 真正稳定了
     const stableValue = useMemo(() => ({
         filterType,
         setFilterType,
@@ -288,6 +339,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         filteredNotes,
         isLoading,
         setSelectedNote,
+        registerUnsavedChangesGuard,
         recentViews,
         clearRecentViews,
         loadNotes,
@@ -296,7 +348,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateNoteTags,
         deleteNote,
         restoreNote
-    }), [filterType, searchQuery, notes, filteredNotes, isLoading, setSelectedNote, recentViews, clearRecentViews, loadNotes, createNote, updateNote, updateNoteTags, deleteNote, restoreNote])
+    }), [filterType, searchQuery, notes, filteredNotes, isLoading, setSelectedNote, registerUnsavedChangesGuard, recentViews, clearRecentViews, loadNotes, createNote, updateNote, updateNoteTags, deleteNote, restoreNote])
 
     const value = useMemo(() => ({
         ...stableValue,
@@ -306,6 +358,31 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (
         <ListContext.Provider value={value}>
             {children}
+            <Dialog open={switchConfirmOpen} onOpenChange={(open) => {
+                if (!open) {
+                    closeSwitchConfirm()
+                }
+            }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>当前内容尚未保存</DialogTitle>
+                        <DialogDescription>
+                            当前笔记有未保存修改。切换文章前，请先选择保存，或放弃本次修改。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={closeSwitchConfirm}>
+                            取消
+                        </Button>
+                        <Button variant="outline" onClick={handleDiscardAndSwitch}>
+                            不保存并切换
+                        </Button>
+                        <Button onClick={() => { void handleSaveAndSwitch() }}>
+                            保存并切换
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </ListContext.Provider>
     )
 }

@@ -5,7 +5,7 @@ export interface ExportRecord {
   note_id: string
   note_title: string
   file_path: string
-  export_type: 'markdown' | 'html' | 'pdf' | 'image'
+  export_type: 'markdown' | 'html' | 'pdf' | 'image' | 'code' | 'docx'
   created_at: string
 }
 

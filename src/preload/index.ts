@@ -3,10 +3,15 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { CHANGETHEME, THEME } from '../constants/index'
 import type {
   AICompletionOptions,
+  AITaskOutputAcceptTarget,
   AIMessage,
   AIModelConfig,
-  AIProvider
-} from '../renderer/src/types/ai'
+  AIProvider,
+  CreateAITaskOutputParams,
+  CreateAITaskParams,
+  CreateAITaskSourceParams,
+  UpdateAITaskParams
+} from '../shared/types/ai'
 
 interface CodeSnippet {
   id: string
@@ -15,8 +20,10 @@ interface CodeSnippet {
   language: string
 }
 
-// Custom APIs for renderer
-const api = {
+type AppCommand = 'save-current-note' | 'new-document' | 'focus-search'
+
+// Custom APIs for renderer — typed via API interface for type safety across IPC boundary
+const api: import('./index').API = {
   changeTheme: (theme: THEME) => {
     ipcRenderer.send(CHANGETHEME, theme)
   },
@@ -26,13 +33,15 @@ const api = {
   },
   // 监听代码片段复制成功事件
   onSnippetCopied: (callback: (title: string) => void) => {
-    ipcRenderer.on('snippet-copied', (_, title) => callback(title))
-    return () => ipcRenderer.removeAllListeners('snippet-copied')
+    const listener = (_event: IpcRendererEvent, title: string): void => callback(title)
+    ipcRenderer.on('snippet-copied', listener)
+    return () => ipcRenderer.removeListener('snippet-copied', listener)
   },
   // 托盘窗口专用 API
   onTraySnippets: (callback: (snippets: CodeSnippet[]) => void) => {
-    ipcRenderer.on('tray-snippets', (_, snippets) => callback(snippets))
-    return () => ipcRenderer.removeAllListeners('tray-snippets')
+    const listener = (_event: IpcRendererEvent, snippets: CodeSnippet[]): void => callback(snippets)
+    ipcRenderer.on('tray-snippets', listener)
+    return () => ipcRenderer.removeListener('tray-snippets', listener)
   },
   copySnippet: (code: string, title: string) => {
     ipcRenderer.send('copy-snippet', code, title)
@@ -51,8 +60,14 @@ const api = {
   },
   // 监听主题变化
   onThemeChanged: (callback: (theme: string) => void) => {
-    ipcRenderer.on('theme-changed', (_, theme) => callback(theme))
-    return () => ipcRenderer.removeAllListeners('theme-changed')
+    const listener = (_event: IpcRendererEvent, theme: string): void => callback(theme)
+    ipcRenderer.on('theme-changed', listener)
+    return () => ipcRenderer.removeListener('theme-changed', listener)
+  },
+  onAppCommand: (callback: (command: AppCommand) => void) => {
+    const listener = (_event: IpcRendererEvent, command: AppCommand): void => callback(command)
+    ipcRenderer.on('app-command', listener)
+    return () => ipcRenderer.removeListener('app-command', listener)
   },
 
   // ============ 数据库 API ============
@@ -61,16 +76,33 @@ const api = {
   notesGetAll: (type?: 'document' | 'snippet', folderId?: string) => {
     return ipcRenderer.invoke('db:notes:getAll', type, folderId)
   },
+  // 获取所有笔记（带标签，单次查询）
+  notesGetAllWithTags: (type?: 'document' | 'snippet', folderId?: string) => {
+    return ipcRenderer.invoke('db:notes:getAllWithTags', type, folderId)
+  },
+  // 获取回收站笔记（带标签）
+  notesGetTrashedWithTags: () => {
+    return ipcRenderer.invoke('db:notes:getTrashedWithTags')
+  },
   // 根据 ID 获取笔记
   notesGetById: (id: string) => {
     return ipcRenderer.invoke('db:notes:getById', id)
   },
   // 创建笔记
-  notesCreate: (params: { title?: string; content?: string; type?: 'document' | 'snippet'; language?: string; folder_id?: string | null }) => {
+  notesCreate: (params: {
+    title?: string
+    content?: string
+    type?: 'document' | 'snippet'
+    language?: string
+    folder_id?: string | null
+  }) => {
     return ipcRenderer.invoke('db:notes:create', params)
   },
   // 更新笔记
-  notesUpdate: (id: string, params: { title?: string; content?: string; language?: string; is_pinned?: number }) => {
+  notesUpdate: (
+    id: string,
+    params: { title?: string; content?: string; language?: string; is_pinned?: number }
+  ) => {
     return ipcRenderer.invoke('db:notes:update', id, params)
   },
   // 移动到回收站
@@ -165,6 +197,14 @@ const api = {
   exportMarkdown: (noteId: string) => {
     return ipcRenderer.invoke('db:export:markdown', noteId)
   },
+  // 导出文档到 Word
+  exportDocx: (noteId: string) => {
+    return ipcRenderer.invoke('db:export:docx', noteId)
+  },
+  // 导出代码片段到源代码文件
+  exportCode: (noteId: string) => {
+    return ipcRenderer.invoke('db:export:code', noteId)
+  },
   // 删除导出记录
   exportsDelete: (id: string) => {
     return ipcRenderer.invoke('db:exports:delete', id)
@@ -217,6 +257,43 @@ const api = {
     return ipcRenderer.invoke('db:tags:getNoteIds', tagId)
   },
 
+  // ============ AI 任务 API ============
+  aiTasksGetAll: (sourceId?: string) => {
+    return ipcRenderer.invoke('db:aiTasks:getAll', sourceId)
+  },
+  aiTasksGetById: (id: string) => {
+    return ipcRenderer.invoke('db:aiTasks:getById', id)
+  },
+  aiTasksCreate: (params: CreateAITaskParams) => {
+    return ipcRenderer.invoke('db:aiTasks:create', params)
+  },
+  aiTasksUpdate: (id: string, params: UpdateAITaskParams) => {
+    return ipcRenderer.invoke('db:aiTasks:update', id, params)
+  },
+  aiTasksDelete: (id: string) => {
+    return ipcRenderer.invoke('db:aiTasks:delete', id)
+  },
+  aiTaskSourcesGet: (taskId: string) => {
+    return ipcRenderer.invoke('db:aiTaskSources:get', taskId)
+  },
+  aiTaskSourcesReplace: (taskId: string, sources: CreateAITaskSourceParams[]) => {
+    return ipcRenderer.invoke('db:aiTaskSources:replace', taskId, sources)
+  },
+  aiTaskOutputsGet: (taskId: string) => {
+    return ipcRenderer.invoke('db:aiTaskOutputs:get', taskId)
+  },
+  aiTaskOutputsReplace: (taskId: string, outputs: CreateAITaskOutputParams[]) => {
+    return ipcRenderer.invoke('db:aiTaskOutputs:replace', taskId, outputs)
+  },
+  aiTaskOutputAccept: (
+    taskId: string,
+    outputId: string,
+    target: AITaskOutputAcceptTarget,
+    noteId?: string
+  ) => {
+    return ipcRenderer.invoke('db:aiTaskOutputs:accept', taskId, outputId, target, noteId)
+  },
+
   // ============ AI API ============
 
   // 获取所有模型
@@ -252,6 +329,9 @@ const api = {
   ) => {
     return ipcRenderer.invoke('ai:completion:stream', modelId, messages, options, sessionId)
   },
+  aiCancelStream: (sessionId: string) => {
+    return ipcRenderer.invoke('ai:completion:cancel', sessionId)
+  },
   // 监听流式数据
   aiOnStreamChunk: (sessionId: string, callback: (chunk: string) => void): (() => void) => {
     const listener = (_event: IpcRendererEvent, chunk: string): void => callback(chunk)
@@ -282,7 +362,6 @@ const api = {
   aiTestModel: (modelId: string) => {
     return ipcRenderer.invoke('ai:model:test', modelId)
   },
-  // 开发环境校验
   runTypecheck: () => {
     return ipcRenderer.invoke('dev:run-typecheck')
   }

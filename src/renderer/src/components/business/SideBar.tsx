@@ -68,7 +68,7 @@ const items: MenuItem[] = [
 
 export function AppSidebar() {
   const { filterType, setFilterType, notes, recentViews, clearRecentViews, selectedNote, setSelectedNote } = useList()
-  const { exports, deleteExport } = useExport()
+  const { exports, deleteExport, ensureLoaded } = useExport()
 
   const handleItemClick = (item: MenuItem) => {
     setFilterType(item.filterType)
@@ -104,6 +104,7 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       isActive={filterType === item.filterType}
                       onClick={() => handleItemClick(item)}
+                      tooltip={item.title}
                       className="cursor-pointer"
                     >
                       <item.icon />
@@ -138,6 +139,7 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           isActive={selectedNote?.id === item.id}
                           onClick={() => handleRecentClick(item.id)}
+                          tooltip={item.title}
                           className="cursor-pointer h-8"
                         >
                           {item.type === 'snippet' ? (
@@ -168,6 +170,7 @@ export function AppSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 onClick={() => window.api.openSettingsWindow()}
+                tooltip="设置"
                 className="cursor-pointer"
               >
                 <Settings />
@@ -177,9 +180,9 @@ export function AppSidebar() {
           </SidebarMenu>
           <SidebarMenu>
             <SidebarMenuItem>
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={(open) => { if (open) void ensureLoaded() }}>
                 <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton>
+                  <SidebarMenuButton tooltip="最近导出">
                     <CloudDownload />
                     <span className="group-data-[collapsible=icon]:hidden">最近导出</span>
                     <ChevronUp className="ml-auto group-data-[collapsible=icon]:hidden" />

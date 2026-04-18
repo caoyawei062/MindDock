@@ -1,5 +1,6 @@
 import { getDatabase } from './index'
 import { v4 as uuidv4 } from 'uuid'
+import type { Tag } from './tags'
 
 // 笔记类型
 export interface Note {
@@ -334,8 +335,69 @@ export function getSnippetsForTray(): {
   }))
 }
 
+/**
+ * 批量获取笔记的标签（避免 N+1 查询）
+ * 返回 Map<noteId, Tag[]>
+ */
+export function getTagsByNoteIds(noteIds: string[]): Map<string, Tag[]> {
+  const result = new Map<string, Tag[]>()
+  if (noteIds.length === 0) return result
+
+  const db = getDatabase()
+  const placeholders = noteIds.map(() => '?').join(',')
+  const rows = db
+    .prepare(
+      `SELECT nt.note_id, t.id, t.name, t.color, t.created_at
+       FROM note_tags nt
+       INNER JOIN tags t ON t.id = nt.tag_id
+       WHERE nt.note_id IN (${placeholders})
+       ORDER BY t.created_at DESC`
+    )
+    .all(...noteIds) as (Tag & { note_id: string })[]
+
+  for (const noteId of noteIds) {
+    result.set(noteId, [])
+  }
+  for (const row of rows) {
+    result.get(row.note_id)!.push({
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      created_at: row.created_at
+    })
+  }
+
+  return result
+}
+
+export interface NoteWithTags extends Note {
+  tags: Tag[]
+}
+
+/**
+ * 获取所有笔记（带标签，单次查询）
+ */
+export function getAllNotesWithTags(
+  type?: 'document' | 'snippet',
+  folderId?: string
+): NoteWithTags[] {
+  const notes = getAllNotes(type, folderId)
+  const tagsMap = getTagsByNoteIds(notes.map((n) => n.id))
+  return notes.map((note) => ({ ...note, tags: tagsMap.get(note.id) || [] }))
+}
+
+/**
+ * 获取回收站笔记（带标签）
+ */
+export function getTrashedNotesWithTags(): NoteWithTags[] {
+  const notes = getTrashedNotes()
+  const tagsMap = getTagsByNoteIds(notes.map((n) => n.id))
+  return notes.map((note) => ({ ...note, tags: tagsMap.get(note.id) || [] }))
+}
+
 export default {
   getAllNotes,
+  getAllNotesWithTags,
   getNoteById,
   createNote,
   updateNote,
@@ -343,7 +405,9 @@ export default {
   restoreNote,
   deleteNote,
   getTrashedNotes,
+  getTrashedNotesWithTags,
   searchNotes,
   togglePinNote,
-  getSnippetsForTray
+  getSnippetsForTray,
+  getTagsByNoteIds
 }
