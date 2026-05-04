@@ -6,12 +6,14 @@ interface ScrollAreaProps {
   children: React.ReactNode
   className?: string
   orientation?: 'vertical' | 'horizontal' | 'both'
+  theme?: 'default' | 'editor'
 }
 
 const ScrollArea: React.FC<ScrollAreaProps> = ({
   children,
   className,
-  orientation = 'vertical'
+  orientation = 'vertical',
+  theme = 'default'
 }) => {
   const overflowOptions = {
     vertical: { x: 'hidden' as const, y: 'scroll' as const },
@@ -26,7 +28,7 @@ const ScrollArea: React.FC<ScrollAreaProps> = ({
         scrollbars: {
           autoHide: 'leave', // 鼠标离开时自动隐藏
           autoHideDelay: 400, // 隐藏延迟 400ms
-          theme: 'os-theme-custom' // 使用自定义主题
+          theme: theme === 'editor' ? 'os-theme-editor' : 'os-theme-custom' // 使用自定义主题
         },
         overflow: overflowOptions[orientation]
       }}

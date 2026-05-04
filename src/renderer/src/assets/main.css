@@ -56,3 +56,30 @@ a {
   --os-padding-perpendicular: 2px;
   --os-padding-axis: 4px;
 }
+
+.os-theme-editor {
+  --os-size: 9px;
+  --os-handle-bg: color-mix(in oklab, var(--muted-foreground) 38%, transparent);
+  --os-handle-bg-hover: color-mix(in oklab, var(--foreground) 56%, transparent);
+  --os-handle-bg-active: color-mix(in oklab, var(--foreground) 72%, transparent);
+  --os-handle-border-radius: 999px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 3px;
+}
+
+.os-theme-editor .os-scrollbar-track {
+  background: transparent;
+}
+
+.os-theme-editor .os-scrollbar-handle {
+  transition:
+    background-color 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+  opacity: 0.78;
+}
+
+.os-theme-editor.os-host:hover .os-scrollbar-handle,
+.os-theme-editor .os-scrollbar-handle:hover {
+  opacity: 1;
+}

@@ -25,11 +25,12 @@ interface AISettingsProps {
 //   deepseek: 'DeepSeek'
 // }
 
-export function AISettings({ open, onOpenChange }: AISettingsProps) {
-  const { models, loadAllModels, updateModel, toggleModel, testModel, error } =
-    useAIConfig()
+export function AISettings({ open, onOpenChange }: AISettingsProps): React.JSX.Element {
+  const { models, loadAllModels, updateModel, toggleModel, testModel, error } = useAIConfig()
   const [testingModel, setTestingModel] = useState<string | null>(null)
-  const [testResults, setTestResults] = useState<Record<string, { success: boolean; error?: string }>>({})
+  const [testResults, setTestResults] = useState<
+    Record<string, { success: boolean; error?: string }>
+  >({})
 
   useEffect(() => {
     if (open) {
@@ -37,32 +38,35 @@ export function AISettings({ open, onOpenChange }: AISettingsProps) {
     }
   }, [open, loadAllModels])
 
-  const handleApiKeyChange = async (modelId: string, apiKey: string) => {
+  const handleApiKeyChange = async (modelId: string, apiKey: string): Promise<void> => {
     await updateModel(modelId, { apiKey })
   }
 
-  const handleBaseURLChange = async (modelId: string, baseURL: string) => {
+  const handleBaseURLChange = async (modelId: string, baseURL: string): Promise<void> => {
     await updateModel(modelId, { baseURL })
   }
 
-  const handleToggleModel = async (modelId: string, enabled: boolean) => {
+  const handleToggleModel = async (modelId: string, enabled: boolean): Promise<void> => {
     await toggleModel(modelId, enabled)
   }
 
-  const handleTestModel = async (modelId: string) => {
+  const handleTestModel = async (modelId: string): Promise<void> => {
     setTestingModel(modelId)
     const result = await testModel(modelId)
     setTestResults((prev) => ({ ...prev, [modelId]: result }))
     setTestingModel(null)
   }
 
-  const groupedModels = models.reduce((acc, model) => {
-    if (!acc[model.provider]) {
-      acc[model.provider] = []
-    }
-    acc[model.provider].push(model)
-    return acc
-  }, {} as Record<AIProvider, AIModelConfig[]>)
+  const groupedModels = models.reduce(
+    (acc, model) => {
+      if (!acc[model.provider]) {
+        acc[model.provider] = []
+      }
+      acc[model.provider].push(model)
+      return acc
+    },
+    {} as Record<AIProvider, AIModelConfig[]>
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

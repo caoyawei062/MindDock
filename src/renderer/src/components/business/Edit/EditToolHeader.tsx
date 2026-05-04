@@ -65,6 +65,7 @@ interface ToolButtonGroupConfig {
 interface EditToolHeaderProps {
   title: string
   onTitleChange: (title: string) => void
+  onSave?: () => void
   mode?: EditorMode
   onModeChange?: (mode: EditorMode) => void
   languages?: LanguageConfig[]
@@ -78,13 +79,15 @@ interface EditToolHeaderProps {
   noteContent?: string // 添加笔记内容用于 AI 生成标签
   onExport?: () => Promise<void>
   noteType?: 'document' | 'snippet'
+  isDirty?: boolean
+  isSaving?: boolean
 }
 
 const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   title,
   onTitleChange,
+  onSave,
   mode = 'word',
-  onModeChange: _onModeChange,
   languages = DEFAULT_LANGUAGES,
   selectedLanguage = 'javascript',
   onLanguageChange,
@@ -94,7 +97,9 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   onTagsChange,
   noteId,
   noteContent = '',
-  noteType = 'document'
+  noteType = 'document',
+  isDirty = false,
+  isSaving = false
 }) => {
   const {
     outlineOpen,
@@ -104,9 +109,12 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
     aiPanelOpen,
     toggleAiPanel,
     editor,
-    setAIInputText
+    setAIInputText,
+    setAIContextText,
+    clearAIContextText,
+    getCodeSelectionText
   } = useEditorContext()
-  const { exportToPDF, exportToImage, exportToMarkdown } = useExport()
+  const { exportToPDF, exportToImage, exportToMarkdown, exportToDocx, exportToCode } = useExport()
   const { deleteNote } = useList()
   const [isExporting, setIsExporting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -116,15 +124,33 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
 
   // 处理 AI 按钮点击
   const handleAIButtonClick = useCallback(() => {
-    if (editor) {
+    if (mode === 'word' && editor) {
       const { from, to } = editor.state.selection
       if (from !== to) {
         const selectedText = editor.state.doc.textBetween(from, to)
-        setAIInputText(selectedText)
+        setAIContextText(selectedText)
+      } else {
+        clearAIContextText()
+      }
+    } else if (mode === 'code') {
+      const selectedCode = getCodeSelectionText()
+      if (selectedCode.trim()) {
+        setAIContextText(selectedCode)
+      } else {
+        clearAIContextText()
       }
     }
+    setAIInputText('')
     toggleAiPanel()
-  }, [editor, setAIInputText, toggleAiPanel])
+  }, [
+    mode,
+    editor,
+    setAIContextText,
+    clearAIContextText,
+    getCodeSelectionText,
+    setAIInputText,
+    toggleAiPanel
+  ])
 
   // 处理导出为 PDF
   const handleExportPDF = useCallback(async () => {
@@ -168,6 +194,32 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
     }
   }, [noteId, isExporting, exportToMarkdown])
 
+  const handleExportDocx = useCallback(async () => {
+    if (!noteId || isExporting) return
+
+    try {
+      setIsExporting(true)
+      await exportToDocx(noteId)
+    } catch (error) {
+      console.error('Export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [noteId, isExporting, exportToDocx])
+
+  const handleExportCode = useCallback(async () => {
+    if (!noteId || isExporting) return
+
+    try {
+      setIsExporting(true)
+      await exportToCode(noteId)
+    } catch (error) {
+      console.error('Export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [noteId, isExporting, exportToCode])
+
   // 处理删除笔记
   const handleDelete = useCallback(async () => {
     if (!noteId) return
@@ -188,18 +240,18 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
     setEditValue(title)
   }, [title])
 
-  const handleTitleClick = () => {
+  const handleTitleClick = (): void => {
     setEditValue(title)
     setIsEditing(true)
   }
 
-  const handleTitleBlur = () => {
+  const handleTitleBlur = (): void => {
     setIsEditing(false)
     const newTitle = editValue.trim() || '未命名文档'
     onTitleChange(newTitle)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter') {
       setIsEditing(false)
       const newTitle = editValue.trim() || '未命名文档'
@@ -233,7 +285,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
           {
             id: 'ai',
             icon: Bot,
-            tooltip: () => (aiPanelOpen ? '收起AI助手' : 'AI助手'),
+            tooltip: () => (aiPanelOpen ? '收起AI任务' : 'AI任务'),
             onClick: handleAIButtonClick,
             isActive: () => aiPanelOpen
           },
@@ -272,7 +324,9 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
             id: 'save',
             icon: Save,
             tooltip: '保存',
-            variant: 'primary'
+            variant: 'primary',
+            onClick: onSave,
+            disabled: !noteId || !isDirty || isSaving
           }
         ]
       }
@@ -284,27 +338,27 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
       toggleToolbar,
       aiPanelOpen,
       handleAIButtonClick,
-      handleExportPDF,
-      handleExportImage,
-      handleExportMarkdown,
       noteId,
-      isExporting
+      isExporting,
+      onSave,
+      isDirty,
+      isSaving
     ]
   )
 
   // 根据模式过滤按钮
-  const filterButtonsByMode = (buttons: ToolButtonConfig[]) => {
+  const filterButtonsByMode = (buttons: ToolButtonConfig[]): ToolButtonConfig[] => {
     return buttons.filter((btn) => !btn.modes || btn.modes.includes(mode))
   }
 
   // 渲染单个按钮
-  const renderButton = (btn: ToolButtonConfig) => {
+  const renderButton = (btn: ToolButtonConfig): React.JSX.Element => {
     const Icon = btn.icon
     const tooltipText = typeof btn.tooltip === 'function' ? btn.tooltip() : btn.tooltip
     const isActive = typeof btn.isActive === 'function' ? btn.isActive() : btn.isActive
     const isDisabled = btn.disabled || false
 
-    const getButtonClassName = () => {
+    const getButtonClassName = (): string => {
       if (isDisabled) {
         return 'opacity-50 cursor-not-allowed text-muted-foreground'
       }
@@ -348,7 +402,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   )
 
   // 渲染带 TagInputDropdown 的按钮
-  const renderTagButton = (btn: ToolButtonConfig) => {
+  const renderTagButton = (btn: ToolButtonConfig): React.JSX.Element => {
     const Icon = btn.icon
     const tooltipText = typeof btn.tooltip === 'function' ? btn.tooltip() : btn.tooltip
     // const isActive = tags.length > 0
@@ -375,7 +429,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   }
 
   // 渲染按钮（根据类型选择不同渲染方式）
-  const renderButtonByType = (btn: ToolButtonConfig) => {
+  const renderButtonByType = (btn: ToolButtonConfig): React.JSX.Element => {
     if (btn.id === 'tag') {
       return renderTagButton(btn)
     }
@@ -405,6 +459,12 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
           <DropdownMenuContent align="start">
             {noteType === 'document' ? (
               <>
+                <DropdownMenuItem onClick={handleExportDocx} disabled={isExporting}>
+                  导出为 Word
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportMarkdown} disabled={isExporting}>
+                  导出为 Markdown
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleExportPDF} disabled={isExporting}>
                   导出为 PDF
                 </DropdownMenuItem>
@@ -413,9 +473,14 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
                 </DropdownMenuItem>
               </>
             ) : (
-              <DropdownMenuItem onClick={handleExportMarkdown} disabled={isExporting}>
-                导出为 Markdown
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onClick={handleExportCode} disabled={isExporting}>
+                  导出为代码文件
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportMarkdown} disabled={isExporting}>
+                  导出为 Markdown
+                </DropdownMenuItem>
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -465,25 +530,32 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
 
         {/* 可编辑标题 */}
         <div className="absolute left-1/2 -translate-x-1/2 no-drag">
-          {isEditing ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={handleTitleBlur}
-              onKeyDown={handleKeyDown}
-              className="bg-accent/30 text-center text-sm font-medium text-foreground outline-none ring-1 ring-primary/50 rounded px-4 py-1.5 min-w-[200px] max-w-[400px] selection:bg-primary/20"
-            />
-          ) : (
-            <button
-              onClick={handleTitleClick}
-              title={title}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50 truncate max-w-[300px]"
-            >
-              {title}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={handleKeyDown}
+                className="bg-accent/30 text-center text-sm font-medium text-foreground outline-none ring-1 ring-primary/50 rounded px-4 py-1.5 min-w-[200px] max-w-[400px] selection:bg-primary/20"
+              />
+            ) : (
+              <button
+                onClick={handleTitleClick}
+                title={title}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50 truncate max-w-[300px]"
+              >
+                {title}
+              </button>
+            )}
+            {isDirty && (
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                未保存
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-1">{rightButtons.map(renderButtonByType)}</div>

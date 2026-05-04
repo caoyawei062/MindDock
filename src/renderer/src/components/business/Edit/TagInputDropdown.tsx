@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Plus, Sparkles, Loader2 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import type { AIModelConfig } from '@renderer/types/ai'
 
 export interface TagItem {
   id: string
@@ -35,26 +36,17 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [models, setModels] = useState<any[]>([])
+  const [models, setModels] = useState<AIModelConfig[]>([])
   const currentResponseRef = useRef('')
 
-  // 加载 AI 模型
-  useEffect(() => {
-    if (isOpen) {
-      loadModels()
-    }
-  }, [isOpen])
-
-  const loadModels = async () => {
+  const loadModels = useCallback(async (): Promise<void> => {
     try {
       const enabledModels = await window.api.aiGetEnabledModels()
       setModels(enabledModels)
     } catch (error) {
       console.error('Failed to load models:', error)
     }
-  }
-
-
+  }, [])
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -65,7 +57,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
     }
   }, [isOpen])
 
-  const handleAddTag = async () => {
+  const handleAddTag = async (): Promise<void> => {
     const trimmedValue = inputValue.trim()
     if (!trimmedValue) return
 
@@ -106,9 +98,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
     }
   }
 
-
-
-  const handleRemoveTag = async (tagId: string) => {
+  const handleRemoveTag = async (tagId: string): Promise<void> => {
     if (noteId) {
       await window.api.tagsRemoveFromNote(noteId, tagId)
     }
@@ -121,7 +111,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
   const [selectedAiTags, setSelectedAiTags] = useState<Set<string>>(new Set())
 
   // AI 生成标签
-  const handleAIGenerateTags = async () => {
+  const handleAIGenerateTags = async (): Promise<void> => {
     if (!noteContent.trim() || isGenerating || models.length === 0) return
 
     setIsGenerating(true)
@@ -133,9 +123,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
       // 使用 AI 生成更多标签供选择
       const prompt = `请根据以下内容生成6个最相关的标签,每个标签2-4个字,用逗号分隔,只返回标签名,不要其他内容:\n\n${noteContent.slice(0, 1000)}`
 
-      const messages = [
-        { role: 'user' as const, content: prompt }
-      ]
+      const messages = [{ role: 'user' as const, content: prompt }]
 
       const sessionId = `tag-gen-${Date.now()}`
       const modelId = models[0].id
@@ -145,20 +133,34 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
         currentResponseRef.current += chunk
       })
 
-      window.api.aiOnStreamComplete(sessionId, async () => {
+      window.api.aiOnStreamComplete(sessionId, async (): Promise<void> => {
         // 解析返回的标签
         const response = currentResponseRef.current
-        const tagNames = response.split(',').map((t: string) => t.trim()).filter((t: string) => t && t.length <= 6 && t.length >= 2)
+        const tagNames = response
+          .split(',')
+          .map((t: string) => t.trim())
+          .filter((t: string) => t && t.length <= 6 && t.length >= 2)
 
         // 过滤掉已有的标签，创建候选列表
         const candidates: TagItem[] = []
         for (const tagName of tagNames.slice(0, 6)) {
           // 跳过已存在的标签
-          if (tags.some(t => t.name === tagName)) continue
-          if (candidates.some(t => t.name === tagName)) continue
+          if (tags.some((t) => t.name === tagName)) continue
+          if (candidates.some((t) => t.name === tagName)) continue
 
           // 生成随机颜色
-          const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#0ea5e9', '#3b82f6']
+          const colors = [
+            '#6366f1',
+            '#8b5cf6',
+            '#ec4899',
+            '#f43f5e',
+            '#f97316',
+            '#eab308',
+            '#22c55e',
+            '#14b8a6',
+            '#0ea5e9',
+            '#3b82f6'
+          ]
           const color = colors[Math.floor(Math.random() * colors.length)]
 
           candidates.push({
@@ -186,7 +188,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
   }
 
   // 切换选中 AI 建议的标签
-  const toggleAiTagSelection = (tagName: string) => {
+  const toggleAiTagSelection = (tagName: string): void => {
     const newSelected = new Set(selectedAiTags)
     if (newSelected.has(tagName)) {
       newSelected.delete(tagName)
@@ -199,8 +201,8 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
   }
 
   // 确认添加选中的 AI 标签
-  const confirmAiTags = async () => {
-    const selectedTags = aiSuggestedTags.filter(t => selectedAiTags.has(t.name))
+  const confirmAiTags = async (): Promise<void> => {
+    const selectedTags = aiSuggestedTags.filter((t) => selectedAiTags.has(t.name))
     const newTags: TagItem[] = []
 
     for (const tag of selectedTags) {
@@ -218,7 +220,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
           await window.api.tagsAddToNote(noteId, newTag.id)
         }
         newTags.push(tagItem)
-      } catch (e) {
+      } catch {
         console.log('Tag may already exist:', tag.name)
       }
 
@@ -231,7 +233,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
     setSelectedAiTags(new Set())
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddTag()
@@ -242,10 +244,15 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
     }
   }
 
-
+  const handleOpenChange = (open: boolean): void => {
+    setIsOpen(open)
+    if (open) {
+      void loadModels()
+    }
+  }
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start" className={cn('w-72 p-2', className)}>
         <div className="space-y-2">
@@ -284,11 +291,11 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={tags.length >= 3 ? "已达到标签上限" : "输入标签名称..."}
+              placeholder={tags.length >= 3 ? '已达到标签上限' : '输入标签名称...'}
               disabled={tags.length >= 3}
               className={cn(
-                "flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground",
-                tags.length >= 3 && "cursor-not-allowed opacity-50"
+                'flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground',
+                tags.length >= 3 && 'cursor-not-allowed opacity-50'
               )}
             />
             <button
@@ -304,8 +311,6 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
               <Plus size={14} />
             </button>
           </div>
-
-
 
           {/* AI 生成标签 */}
           {tags.length < 3 && (
@@ -333,7 +338,9 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
               {/* AI 建议标签选择区域 */}
               {aiSuggestedTags.length > 0 && (
                 <div className="mt-2 space-y-2">
-                  <p className="text-[10px] text-muted-foreground">点击选择标签（最多选择 {3 - tags.length} 个）</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    点击选择标签（最多选择 {3 - tags.length} 个）
+                  </p>
                   <div className="flex flex-wrap gap-1.5">
                     {aiSuggestedTags.map((tag) => {
                       const isSelected = selectedAiTags.has(tag.name)
@@ -363,11 +370,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
                     })}
                   </div>
                   {selectedAiTags.size > 0 && (
-                    <Button
-                      onClick={confirmAiTags}
-                      size="sm"
-                      className="w-full h-7 text-xs"
-                    >
+                    <Button onClick={confirmAiTags} size="sm" className="w-full h-7 text-xs">
                       添加 {selectedAiTags.size} 个标签
                     </Button>
                   )}
@@ -378,7 +381,7 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
 
           {/* 提示文本 */}
           <p className="text-[10px] text-muted-foreground">
-            {tags.length >= 3 ? "最多添加3个标签" : "按 Enter 添加标签，Backspace 删除"}
+            {tags.length >= 3 ? '最多添加3个标签' : '按 Enter 添加标签，Backspace 删除'}
           </p>
         </div>
       </DropdownMenuContent>

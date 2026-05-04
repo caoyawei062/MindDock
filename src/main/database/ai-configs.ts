@@ -1,10 +1,20 @@
 import { getDatabase } from './index'
 import { AIModelConfig, AIProvider } from '../ai/types'
 
+interface AIConfigRow {
+  id: string
+  name: string
+  provider: string
+  model: string
+  enabled: number
+  api_key: string | null
+  base_url: string | null
+}
+
 /**
  * 将数据库行转换为 AIModelConfig
  */
-function rowToAIConfig(row: any): AIModelConfig {
+function rowToAIConfig(row: AIConfigRow): AIModelConfig {
   return {
     id: row.id,
     name: row.name,
@@ -21,7 +31,7 @@ function rowToAIConfig(row: any): AIModelConfig {
  */
 export function getAllAIConfigs(): AIModelConfig[] {
   const db = getDatabase()
-  const rows = db.prepare('SELECT * FROM ai_configs ORDER BY provider, name').all()
+  const rows = db.prepare('SELECT * FROM ai_configs ORDER BY provider, name').all() as AIConfigRow[]
   return rows.map(rowToAIConfig)
 }
 
@@ -30,7 +40,9 @@ export function getAllAIConfigs(): AIModelConfig[] {
  */
 export function getEnabledAIConfigs(): AIModelConfig[] {
   const db = getDatabase()
-  const rows = db.prepare('SELECT * FROM ai_configs WHERE enabled = 1 ORDER BY provider, name').all()
+  const rows = db
+    .prepare('SELECT * FROM ai_configs WHERE enabled = 1 ORDER BY provider, name')
+    .all() as AIConfigRow[]
   return rows.map(rowToAIConfig)
 }
 
@@ -39,7 +51,9 @@ export function getEnabledAIConfigs(): AIModelConfig[] {
  */
 export function getAIConfigsByProvider(provider: AIProvider): AIModelConfig[] {
   const db = getDatabase()
-  const rows = db.prepare('SELECT * FROM ai_configs WHERE provider = ? ORDER BY name').all(provider)
+  const rows = db
+    .prepare('SELECT * FROM ai_configs WHERE provider = ? ORDER BY name')
+    .all(provider) as AIConfigRow[]
   return rows.map(rowToAIConfig)
 }
 
@@ -48,7 +62,7 @@ export function getAIConfigsByProvider(provider: AIProvider): AIModelConfig[] {
  */
 export function getAIConfigById(id: string): AIModelConfig | undefined {
   const db = getDatabase()
-  const row = db.prepare('SELECT * FROM ai_configs WHERE id = ?').get(id)
+  const row = db.prepare('SELECT * FROM ai_configs WHERE id = ?').get(id) as AIConfigRow | undefined
   return row ? rowToAIConfig(row) : undefined
 }
 

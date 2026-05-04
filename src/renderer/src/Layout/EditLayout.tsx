@@ -4,19 +4,28 @@ import Tiptap from '../components/business/Edit/Tiptap'
 import Codemirror from '../components/business/Edit/Codemirror'
 import OutlineView from '../components/business/Edit/OutlineView'
 import WelcomeView from '../components/business/Edit/WelcomeView'
-import ScrollArea from '@renderer/components/ui/scroll-area'
 import { useEditorContext } from '@renderer/provider/EditorProvider'
 import { useNoteEditor } from '@renderer/hooks/useNoteEditor'
 import { cn } from '@/lib/utils'
 import { ChartNoAxesGantt } from 'lucide-react'
 import { DEFAULT_LANGUAGES } from '../components/business/Edit/types'
-import { AISidebar } from '@renderer/components/business/AI'
+import { AITaskSidebar } from '@renderer/components/business/AI'
 
 // 窄屏阈值（像素）
 const NARROW_THRESHOLD = 500
 
-const EditLayout = () => {
-  const { outlineOpen, outlineItems, editor, aiPanelOpen } = useEditorContext()
+const EditLayout = (): React.JSX.Element => {
+  const {
+    outlineOpen,
+    setOutlineOpen,
+    outlineItems,
+    updateOutlineItems,
+    editor,
+    aiPanelOpen,
+    setCodeSelectionText,
+    clearCodeSelectionText,
+    setCodeEditorView
+  } = useEditorContext()
   const {
     note,
     title,
@@ -30,7 +39,10 @@ const EditLayout = () => {
     codeMirrorConfig,
     setCodeMirrorConfig,
     tags,
-    setTags
+    setTags,
+    isDirty,
+    isSaving,
+    saveNote
   } = useNoteEditor({ editor })
 
   const [containerWidth, setContainerWidth] = useState(0)
@@ -52,6 +64,32 @@ const EditLayout = () => {
     observer.observe(containerRef.current)
     return () => observer.disconnect()
   }, [])
+
+  React.useEffect(() => {
+    if (editorMode !== 'code') {
+      clearCodeSelectionText()
+      setCodeEditorView(null)
+    }
+    // 切换到 code 模式时关闭大纲
+    if (editorMode === 'code') {
+      setOutlineOpen(false)
+    }
+  }, [editorMode, clearCodeSelectionText, setCodeEditorView, setOutlineOpen])
+
+  // 切换文档时刷新大纲（setContent 使用 emitUpdate: false，不会触发 onUpdate）
+  React.useEffect(() => {
+    if (note?.id && editor) {
+      updateOutlineItems()
+    }
+  }, [note?.id, editor, updateOutlineItems])
+
+  React.useEffect(() => {
+    return window.api.onAppCommand((command) => {
+      if (command === 'save-current-note') {
+        void saveNote()
+      }
+    })
+  }, [saveNote])
 
   // 处理 AI 侧边栏拖拽
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -84,17 +122,11 @@ const EditLayout = () => {
 
   // 点击大纲项滚动到对应位置
   const handleOutlineItemClick = useCallback(
-    (id: string) => {
+    (id: string): void => {
       if (!editor) return
 
       const pos = parseInt(id.replace('heading-', ''), 10)
-      editor.chain().focus().setTextSelection(pos).run()
-
-      // 滚动到视图
-      const element = editor.view.domAtPos(pos)
-      if (element.node instanceof HTMLElement) {
-        element.node.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
+      editor.chain().focus().setTextSelection(pos).scrollIntoView().run()
     },
     [editor]
   )
@@ -113,6 +145,9 @@ const EditLayout = () => {
       <EditToolHeader
         title={title}
         onTitleChange={setTitle}
+        onSave={() => {
+          void saveNote()
+        }}
         mode={editorMode}
         onModeChange={setEditorMode}
         languages={DEFAULT_LANGUAGES}
@@ -125,6 +160,8 @@ const EditLayout = () => {
         noteId={note?.id}
         noteContent={editorMode === 'word' ? editor?.getHTML() || '' : codeContent}
         noteType={note?.type}
+        isDirty={isDirty}
+        isSaving={isSaving}
       />
       <div className="flex-1 flex overflow-hidden relative">
         {/* 大纲视图 - 宽屏内嵌 */}
@@ -171,7 +208,7 @@ const EditLayout = () => {
         )}
 
         {/* 编辑器 */}
-        <ScrollArea
+        <div
           className={cn(
             'flex-1 w-full min-w-0 overflow-hidden',
             outlineOpen && !isNarrow && 'border-l-0',
@@ -186,9 +223,11 @@ const EditLayout = () => {
               onChange={setCodeContent}
               language={selectedLanguage}
               config={codeMirrorConfig}
+              onSelectionChange={setCodeSelectionText}
+              onEditorReady={setCodeEditorView}
             />
           )}
-        </ScrollArea>
+        </div>
 
         {/* AI 侧边栏 */}
         {aiPanelOpen && (
@@ -207,7 +246,7 @@ const EditLayout = () => {
 
             {/* 侧边栏 */}
             <div className="shrink-0 overflow-hidden" style={{ width: `${aiSidebarWidth}px` }}>
-              <AISidebar className="h-full" />
+              <AITaskSidebar className="h-full" editorMode={editorMode} />
             </div>
           </>
         )}

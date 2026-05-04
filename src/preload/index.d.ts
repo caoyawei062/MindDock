@@ -1,5 +1,21 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { THEME } from '../constants/index'
+import {
+  AICompletionOptions,
+  AICompletionResult,
+  AIMessage,
+  AIModelConfig,
+  AIProvider,
+  AITask,
+  AITaskOutput,
+  AITaskOutputAcceptResult,
+  AITaskOutputAcceptTarget,
+  AITaskSource,
+  CreateAITaskOutputParams,
+  CreateAITaskParams,
+  CreateAITaskSourceParams,
+  UpdateAITaskParams
+} from '../shared/types/ai'
 
 interface CodeSnippet {
   id: string
@@ -64,11 +80,24 @@ interface ExportRecord {
   note_id: string
   note_title: string
   file_path: string
-  export_type: 'markdown' | 'html' | 'pdf' | 'image'
+  export_type: 'markdown' | 'html' | 'pdf' | 'image' | 'code' | 'docx'
   created_at: string
 }
 
-interface API {
+interface AIStreamResponse {
+  success: boolean
+  error?: string
+}
+
+type AppCommand = 'save-current-note' | 'new-document' | 'focus-search'
+
+interface AIGenerateResponse {
+  success: boolean
+  data?: AICompletionResult
+  error?: string
+}
+
+export interface API {
   changeTheme: (theme: THEME) => void
   updateTraySnippets: (snippets: CodeSnippet[]) => void
   onSnippetCopied: (callback: (title: string) => void) => () => void
@@ -80,9 +109,15 @@ interface API {
   openSettingsWindow: () => void
   quitApp: () => void
   onThemeChanged: (callback: (theme: string) => void) => () => void
+  onAppCommand: (callback: (command: AppCommand) => void) => () => void
 
   // 数据库 API
   notesGetAll: (type?: 'document' | 'snippet', folderId?: string) => Promise<Note[]>
+  notesGetAllWithTags: (
+    type?: 'document' | 'snippet',
+    folderId?: string
+  ) => Promise<(Note & { tags: Tag[] })[]>
+  notesGetTrashedWithTags: () => Promise<(Note & { tags: Tag[] })[]>
   notesGetById: (id: string) => Promise<Note | null>
   notesCreate: (params: {
     title?: string
@@ -93,7 +128,13 @@ interface API {
   }) => Promise<Note>
   notesUpdate: (
     id: string,
-    params: { title?: string; content?: string; language?: string; is_pinned?: number }
+    params: {
+      title?: string
+      content?: string
+      language?: string
+      is_pinned?: number
+      is_favorite?: number
+    }
   ) => Promise<Note | null>
   notesTrash: (id: string) => Promise<boolean>
   notesRestore: (id: string) => Promise<boolean>
@@ -135,6 +176,8 @@ interface API {
   exportPDF: (noteId: string) => Promise<ExportRecord | null>
   exportImage: (noteId: string) => Promise<ExportRecord | null>
   exportMarkdown: (noteId: string) => Promise<ExportRecord | null>
+  exportDocx: (noteId: string) => Promise<ExportRecord | null>
+  exportCode: (noteId: string) => Promise<ExportRecord | null>
   exportsDelete: (id: string) => Promise<boolean>
   openPath: (path: string) => Promise<void>
 
@@ -150,19 +193,53 @@ interface API {
   tagsSetNoteTags: (noteId: string, tagIds: string[]) => Promise<void>
   tagsGetNoteIds: (tagId: string) => Promise<string[]>
 
+  // AI 任务 API
+  aiTasksGetAll: (sourceId?: string) => Promise<AITask[]>
+  aiTasksGetById: (id: string) => Promise<AITask | null>
+  aiTasksCreate: (params: CreateAITaskParams) => Promise<AITask>
+  aiTasksUpdate: (id: string, params: UpdateAITaskParams) => Promise<AITask | null>
+  aiTasksDelete: (id: string) => Promise<boolean>
+  aiTaskSourcesGet: (taskId: string) => Promise<AITaskSource[]>
+  aiTaskSourcesReplace: (
+    taskId: string,
+    sources: CreateAITaskSourceParams[]
+  ) => Promise<AITaskSource[]>
+  aiTaskOutputsGet: (taskId: string) => Promise<AITaskOutput[]>
+  aiTaskOutputsReplace: (
+    taskId: string,
+    outputs: CreateAITaskOutputParams[]
+  ) => Promise<AITaskOutput[]>
+  aiTaskOutputAccept: (
+    taskId: string,
+    outputId: string,
+    target: AITaskOutputAcceptTarget,
+    noteId?: string
+  ) => Promise<AITaskOutputAcceptResult>
+
   // AI API
-  aiGetAllModels: () => Promise<any[]>
-  aiGetEnabledModels: () => Promise<any[]>
-  aiGetModelById: (id: string) => Promise<any>
-  aiUpdateModel: (id: string, updates: any) => Promise<any>
-  aiToggleModel: (id: string, enabled: boolean) => Promise<any>
-  aiGetModelsByProvider: (provider: string) => Promise<any[]>
-  aiStreamCompletion: (modelId: string, messages: any[], options: any, sessionId: string) => Promise<any>
+  aiGetAllModels: () => Promise<AIModelConfig[]>
+  aiGetEnabledModels: () => Promise<AIModelConfig[]>
+  aiGetModelById: (id: string) => Promise<AIModelConfig | undefined>
+  aiUpdateModel: (id: string, updates: Partial<AIModelConfig>) => Promise<AIModelConfig | null>
+  aiToggleModel: (id: string, enabled: boolean) => Promise<AIModelConfig | null>
+  aiGetModelsByProvider: (provider: AIProvider) => Promise<AIModelConfig[]>
+  aiStreamCompletion: (
+    modelId: string,
+    messages: AIMessage[],
+    options: Partial<AICompletionOptions>,
+    sessionId: string
+  ) => Promise<AIStreamResponse>
+  aiCancelStream: (sessionId: string) => Promise<{ success: boolean }>
   aiOnStreamChunk: (sessionId: string, callback: (chunk: string) => void) => () => void
   aiOnStreamComplete: (sessionId: string, callback: () => void) => () => void
   aiOnStreamError: (sessionId: string, callback: (error: string) => void) => () => void
-  aiGenerateCompletion: (modelId: string, messages: any[], options: any) => Promise<any>
+  aiGenerateCompletion: (
+    modelId: string,
+    messages: AIMessage[],
+    options: Partial<AICompletionOptions>
+  ) => Promise<AIGenerateResponse>
   aiTestModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
+  runTypecheck: () => Promise<{ success: boolean; output: string }>
 }
 
 declare global {

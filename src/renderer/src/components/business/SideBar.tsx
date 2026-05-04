@@ -8,6 +8,7 @@ import {
   Clock,
   X,
   Settings,
+  Star,
   LucideIcon
 } from 'lucide-react'
 import ScrollArea from '@/components/ui/scroll-area'
@@ -33,7 +34,7 @@ import { useList, FilterType } from '@renderer/provider/ListProvider'
 // import { FolderSection } from './FolderTree' // 暂时隐藏文件夹功能
 import { useExport } from '@renderer/provider/ExportProvider'
 import { formatDistanceToNow } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { useI18n } from '@renderer/provider/I18nProvider'
 
 // 菜单项类型
 interface MenuItem {
@@ -42,41 +43,54 @@ interface MenuItem {
   icon: LucideIcon
 }
 
-// Menu items.
-const items: MenuItem[] = [
-  {
-    title: '所有内容',
-    filterType: 'all',
-    icon: LayoutGrid
-  },
-  {
-    title: '文档',
-    filterType: 'document',
-    icon: FileText
-  },
-  {
-    title: '代码片段',
-    filterType: 'snippet',
-    icon: CodeXml
-  },
-  {
-    title: '废纸篓',
-    filterType: 'trash',
-    icon: Trash2
-  }
-]
+export function AppSidebar(): React.JSX.Element {
+  const {
+    filterType,
+    setFilterType,
+    notes,
+    recentViews,
+    clearRecentViews,
+    selectedNote,
+    setSelectedNote
+  } = useList()
+  const { exports, deleteExport, ensureLoaded } = useExport()
+  const { dateFnsLocale, t } = useI18n()
 
-export function AppSidebar() {
-  const { filterType, setFilterType, notes, recentViews, clearRecentViews, selectedNote, setSelectedNote } = useList()
-  const { exports, deleteExport } = useExport()
+  const items: MenuItem[] = [
+    {
+      title: t('common.all'),
+      filterType: 'all',
+      icon: LayoutGrid
+    },
+    {
+      title: t('common.favorite'),
+      filterType: 'favorite',
+      icon: Star
+    },
+    {
+      title: t('common.document'),
+      filterType: 'document',
+      icon: FileText
+    },
+    {
+      title: t('common.snippet'),
+      filterType: 'snippet',
+      icon: CodeXml
+    },
+    {
+      title: t('common.trash'),
+      filterType: 'trash',
+      icon: Trash2
+    }
+  ]
 
-  const handleItemClick = (item: MenuItem) => {
+  const handleItemClick = (item: MenuItem): void => {
     setFilterType(item.filterType)
   }
 
   // 点击最近查看项
-  const handleRecentClick = (id: string) => {
-    const note = notes.find(n => n.id === id)
+  const handleRecentClick = (id: string): void => {
+    const note = notes.find((n) => n.id === id)
     if (note) {
       setSelectedNote(note)
     }
@@ -96,7 +110,7 @@ export function AppSidebar() {
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>个人收藏</SidebarGroupLabel>
+            <SidebarGroupLabel>{t('sidebar.section.content')}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {items.map((item) => (
@@ -104,6 +118,7 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       isActive={filterType === item.filterType}
                       onClick={() => handleItemClick(item)}
+                      tooltip={item.title}
                       className="cursor-pointer"
                     >
                       <item.icon />
@@ -121,13 +136,13 @@ export function AppSidebar() {
               <SidebarGroupLabel className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Clock size={12} className="text-muted-foreground" />
-                  最近查看
+                  {t('sidebar.section.recent')}
                 </span>
                 <button
                   onClick={clearRecentViews}
                   className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent"
                 >
-                  清空
+                  {t('common.clear')}
                 </button>
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -138,6 +153,7 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           isActive={selectedNote?.id === item.id}
                           onClick={() => handleRecentClick(item.id)}
+                          tooltip={item.title}
                           className="cursor-pointer h-8"
                         >
                           {item.type === 'snippet' ? (
@@ -168,27 +184,36 @@ export function AppSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 onClick={() => window.api.openSettingsWindow()}
+                tooltip={t('sidebar.settings')}
                 className="cursor-pointer"
               >
                 <Settings />
-                <span className="group-data-[collapsible=icon]:hidden">设置</span>
+                <span className="group-data-[collapsible=icon]:hidden">
+                  {t('sidebar.settings')}
+                </span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
           <SidebarMenu>
             <SidebarMenuItem>
-              <DropdownMenu>
+              <DropdownMenu
+                onOpenChange={(open) => {
+                  if (open) void ensureLoaded()
+                }}
+              >
                 <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton>
+                  <SidebarMenuButton tooltip={t('sidebar.recentExports')}>
                     <CloudDownload />
-                    <span className="group-data-[collapsible=icon]:hidden">最近导出</span>
+                    <span className="group-data-[collapsible=icon]:hidden">
+                      {t('sidebar.recentExports')}
+                    </span>
                     <ChevronUp className="ml-auto group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" className="w-64" align="end">
                   {exports.length === 0 ? (
                     <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                      暂无导出记录
+                      {t('sidebar.noExports')}
                     </div>
                   ) : (
                     <>
@@ -221,16 +246,19 @@ export function AppSidebar() {
                                     }
                                   }}
                                   className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-destructive/20 rounded transition-all"
-                                  title="删除记录"
+                                  title={t('sidebar.deleteExportRecord')}
                                 >
-                                  <X size={12} className="text-muted-foreground hover:text-destructive" />
+                                  <X
+                                    size={12}
+                                    className="text-muted-foreground hover:text-destructive"
+                                  />
                                 </button>
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <Clock size={10} />
                                 {formatDistanceToNow(new Date(exp.created_at), {
                                   addSuffix: true,
-                                  locale: zhCN
+                                  locale: dateFnsLocale
                                 })}
                               </div>
                             </div>

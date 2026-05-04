@@ -1,5 +1,6 @@
 import { getDatabase } from './index'
 import { v4 as uuidv4 } from 'uuid'
+import type { Tag } from './tags'
 
 // 笔记类型
 export interface Note {
@@ -99,13 +100,15 @@ export function createNote(params: CreateNoteParams = {}): Note {
     trashed_at: null
   }
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO notes (
       id, title, content, type, language, folder_id,
       is_pinned, is_trashed, is_favorite, sort_order, word_count,
       created_at, updated_at, trashed_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `
+  ).run(
     note.id,
     note.title,
     note.content,
@@ -141,7 +144,8 @@ export function updateNote(id: string, params: UpdateNoteParams): Note | null {
     updated_at: new Date().toISOString()
   }
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE notes SET
       title = ?,
       content = ?,
@@ -153,7 +157,8 @@ export function updateNote(id: string, params: UpdateNoteParams): Note | null {
       word_count = ?,
       updated_at = ?
     WHERE id = ?
-  `).run(
+  `
+  ).run(
     updated.title,
     updated.content,
     updated.language,
@@ -244,7 +249,7 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
   const tagResults = db.prepare(tagSearchSql).all(...tagSearchParams) as Note[]
 
   // 使用 FTS5 搜索标题和内容
-  let ftsSql = `
+  const ftsSql = `
     SELECT n.* FROM notes n
     JOIN notes_fts fts ON n.rowid = fts.rowid
     WHERE notes_fts MATCH ? AND n.is_trashed = 0
@@ -261,7 +266,7 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
     textResults = db.prepare(ftsSql).all(...ftsParams) as Note[]
   } catch {
     // FTS 搜索失败，回退到 LIKE 搜索
-    let fallbackSql = `
+    const fallbackSql = `
       SELECT * FROM notes
       WHERE is_trashed = 0 AND (title LIKE ? OR content LIKE ?)
       ${type ? 'AND type = ?' : ''}
@@ -280,19 +285,19 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
   const allResults = new Map<string, Note>()
 
   // 先添加标签匹配的结果（优先级更高）
-  tagResults.forEach(note => {
+  tagResults.forEach((note) => {
     allResults.set(note.id, note)
   })
 
   // 再添加文本搜索的结果
-  textResults.forEach(note => {
+  textResults.forEach((note) => {
     allResults.set(note.id, note)
   })
 
   // 转换为数组并排序：标签匹配的在前，然后按更新时间排序
   const results = Array.from(allResults.values()).sort((a, b) => {
-    const aInTag = tagResults.some(t => t.id === a.id)
-    const bInTag = tagResults.some(t => t.id === b.id)
+    const aInTag = tagResults.some((t) => t.id === a.id)
+    const bInTag = tagResults.some((t) => t.id === b.id)
 
     if (aInTag && !bInTag) return -1
     if (!aInTag && bInTag) return 1
@@ -301,6 +306,15 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
   })
 
   return results
+}
+
+/**
+ * 搜索笔记（带标签）
+ */
+export function searchNotesWithTags(query: string, type?: 'document' | 'snippet'): NoteWithTags[] {
+  const notes = searchNotes(query, type)
+  const tagsMap = getTagsByNoteIds(notes.map((note) => note.id))
+  return notes.map((note) => ({ ...note, tags: tagsMap.get(note.id) || [] }))
 }
 
 /**
@@ -334,8 +348,69 @@ export function getSnippetsForTray(): {
   }))
 }
 
+/**
+ * 批量获取笔记的标签（避免 N+1 查询）
+ * 返回 Map<noteId, Tag[]>
+ */
+export function getTagsByNoteIds(noteIds: string[]): Map<string, Tag[]> {
+  const result = new Map<string, Tag[]>()
+  if (noteIds.length === 0) return result
+
+  const db = getDatabase()
+  const placeholders = noteIds.map(() => '?').join(',')
+  const rows = db
+    .prepare(
+      `SELECT nt.note_id, t.id, t.name, t.color, t.created_at
+       FROM note_tags nt
+       INNER JOIN tags t ON t.id = nt.tag_id
+       WHERE nt.note_id IN (${placeholders})
+       ORDER BY t.created_at DESC`
+    )
+    .all(...noteIds) as (Tag & { note_id: string })[]
+
+  for (const noteId of noteIds) {
+    result.set(noteId, [])
+  }
+  for (const row of rows) {
+    result.get(row.note_id)!.push({
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      created_at: row.created_at
+    })
+  }
+
+  return result
+}
+
+export interface NoteWithTags extends Note {
+  tags: Tag[]
+}
+
+/**
+ * 获取所有笔记（带标签，单次查询）
+ */
+export function getAllNotesWithTags(
+  type?: 'document' | 'snippet',
+  folderId?: string
+): NoteWithTags[] {
+  const notes = getAllNotes(type, folderId)
+  const tagsMap = getTagsByNoteIds(notes.map((n) => n.id))
+  return notes.map((note) => ({ ...note, tags: tagsMap.get(note.id) || [] }))
+}
+
+/**
+ * 获取回收站笔记（带标签）
+ */
+export function getTrashedNotesWithTags(): NoteWithTags[] {
+  const notes = getTrashedNotes()
+  const tagsMap = getTagsByNoteIds(notes.map((n) => n.id))
+  return notes.map((note) => ({ ...note, tags: tagsMap.get(note.id) || [] }))
+}
+
 export default {
   getAllNotes,
+  getAllNotesWithTags,
   getNoteById,
   createNote,
   updateNote,
@@ -343,7 +418,10 @@ export default {
   restoreNote,
   deleteNote,
   getTrashedNotes,
+  getTrashedNotesWithTags,
   searchNotes,
+  searchNotesWithTags,
   togglePinNote,
-  getSnippetsForTray
+  getSnippetsForTray,
+  getTagsByNoteIds
 }

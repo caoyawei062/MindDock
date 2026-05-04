@@ -1,4 +1,3 @@
-
 import { THEME } from '../../../../constants/index'
 import { useTheme } from '@renderer/provider/ThemeProvider'
 import { useState } from 'react'
@@ -6,11 +5,11 @@ import { AISettings } from './AI/AISettings'
 import { Sparkles, Sun, Moon } from 'lucide-react'
 import { Button } from '@renderer/components/ui/button'
 
-const FloatBall = () => {
+const FloatBall = (): React.JSX.Element => {
   const { theme, setTheme } = useTheme()
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
 
-  const changeTheme = () => {
+  const changeTheme = (): void => {
     const newTheme = theme === 'dark' ? THEME.LIGHT : THEME.DARK
     setTheme(newTheme)
     window.api.changeTheme(newTheme)
@@ -29,11 +28,7 @@ const FloatBall = () => {
           }`}
           onClick={changeTheme}
         >
-          {theme === 'dark' ? (
-            <Sun className="w-5 h-5" />
-          ) : (
-            <Moon className="w-5 h-5" />
-          )}
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </Button>
 
         {/* AI 设置按钮 */}

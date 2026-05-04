@@ -45,7 +45,7 @@ interface ProviderSummary {
   isActive: boolean
 }
 
-export function AppSettings({ open, onOpenChange }: AppSettingsProps) {
+export function AppSettings({ open, onOpenChange }: AppSettingsProps): React.JSX.Element {
   const { theme, setTheme } = useTheme()
   const { models, loadAllModels, updateModel, toggleModel, testModel, error } = useAIConfig()
   const [testingProvider, setTestingProvider] = useState<AIProvider | null>(null)
@@ -59,7 +59,6 @@ export function AppSettings({ open, onOpenChange }: AppSettingsProps) {
   const [baseURLDraft, setBaseURLDraft] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [hasInconsistentProviderConfig, setHasInconsistentProviderConfig] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -93,17 +92,28 @@ export function AppSettings({ open, onOpenChange }: AppSettingsProps) {
     })
   }, [providerSearchQuery, providerSummaries])
 
+  const activeProvider = useMemo(() => {
+    if (visibleProviders.length === 0) return null
+    if (
+      selectedProvider &&
+      visibleProviders.some((provider) => provider.provider === selectedProvider)
+    ) {
+      return selectedProvider
+    }
+    return visibleProviders[0].provider
+  }, [selectedProvider, visibleProviders])
+
   const selectedProviderSummary = useMemo(() => {
-    if (!selectedProvider) return null
-    return providerSummaries.find((item) => item.provider === selectedProvider) || null
-  }, [providerSummaries, selectedProvider])
+    if (!activeProvider) return null
+    return providerSummaries.find((item) => item.provider === activeProvider) || null
+  }, [activeProvider, providerSummaries])
 
   const selectedProviderModels = useMemo(() => {
-    if (!selectedProvider) return []
+    if (!activeProvider) return []
     return models
-      .filter((model) => model.provider === selectedProvider)
+      .filter((model) => model.provider === activeProvider)
       .sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name))
-  }, [models, selectedProvider])
+  }, [activeProvider, models])
 
   const visibleModels = useMemo(() => {
     const query = modelSearchQuery.trim().toLowerCase()
@@ -113,47 +123,36 @@ export function AppSettings({ open, onOpenChange }: AppSettingsProps) {
     })
   }, [selectedProviderModels, modelSearchQuery])
 
-  useEffect(() => {
-    if (visibleProviders.length === 0) {
-      setSelectedProvider(null)
-      return
+  const providerDraftDefaults = useMemo(() => {
+    if (!activeProvider || selectedProviderModels.length === 0) {
+      return {
+        apiKey: '',
+        baseURL: '',
+        hasInconsistentProviderConfig: false
+      }
     }
-
-    if (
-      !selectedProvider ||
-      !visibleProviders.some((provider) => provider.provider === selectedProvider)
-    ) {
-      setSelectedProvider(visibleProviders[0].provider)
-    }
-  }, [visibleProviders, selectedProvider])
-
-  useEffect(() => {
-    if (!selectedProvider || selectedProviderModels.length === 0) {
-      setApiKeyDraft('')
-      setBaseURLDraft('')
-      setIsDirty(false)
-      setHasInconsistentProviderConfig(false)
-      return
-    }
-
     const apiKeys = selectedProviderModels.map((model) => model.apiKey || '')
     const baseURLs = selectedProviderModels.map((model) => model.baseURL || '')
     const hasConsistentApiKey = apiKeys.every((key) => key === apiKeys[0])
     const hasConsistentBaseURL = baseURLs.every((url) => url === baseURLs[0])
 
-    setApiKeyDraft(hasConsistentApiKey ? apiKeys[0] : '')
-    setBaseURLDraft(hasConsistentBaseURL ? baseURLs[0] : '')
-    setHasInconsistentProviderConfig(!hasConsistentApiKey || !hasConsistentBaseURL)
-    setIsDirty(false)
-  }, [selectedProvider, selectedProviderModels])
+    return {
+      apiKey: hasConsistentApiKey ? apiKeys[0] : '',
+      baseURL: hasConsistentBaseURL ? baseURLs[0] : '',
+      hasInconsistentProviderConfig: !hasConsistentApiKey || !hasConsistentBaseURL
+    }
+  }, [activeProvider, selectedProviderModels])
+
+  const visibleApiKeyDraft = isDirty ? apiKeyDraft : providerDraftDefaults.apiKey
+  const visibleBaseURLDraft = isDirty ? baseURLDraft : providerDraftDefaults.baseURL
 
   const handleSaveProviderConfig = async (): Promise<boolean> => {
-    if (!selectedProvider || selectedProviderModels.length === 0) return false
+    if (!activeProvider || selectedProviderModels.length === 0) return false
 
     setIsSaving(true)
     const updatePayload = {
-      apiKey: apiKeyDraft.trim() || undefined,
-      baseURL: baseURLDraft.trim() || undefined
+      apiKey: visibleApiKeyDraft.trim() || undefined,
+      baseURL: visibleBaseURLDraft.trim() || undefined
     }
 
     const results = await Promise.all(
@@ -163,32 +162,29 @@ export function AppSettings({ open, onOpenChange }: AppSettingsProps) {
 
     if (results.every(Boolean)) {
       setIsDirty(false)
-      setHasInconsistentProviderConfig(false)
       return true
     }
     return false
   }
 
-  const handleResetDraft = () => {
-    if (!selectedProvider || selectedProviderModels.length === 0) return
-    const apiKeys = selectedProviderModels.map((model) => model.apiKey || '')
-    const baseURLs = selectedProviderModels.map((model) => model.baseURL || '')
-    setApiKeyDraft(apiKeys.every((key) => key === apiKeys[0]) ? apiKeys[0] : '')
-    setBaseURLDraft(baseURLs.every((url) => url === baseURLs[0]) ? baseURLs[0] : '')
+  const handleResetDraft = (): void => {
+    if (!activeProvider || selectedProviderModels.length === 0) return
+    setApiKeyDraft(providerDraftDefaults.apiKey)
+    setBaseURLDraft(providerDraftDefaults.baseURL)
     setIsDirty(false)
   }
 
-  const handleToggleProvider = async (enabled: boolean) => {
-    if (!selectedProvider || selectedProviderModels.length === 0) return
+  const handleToggleProvider = async (enabled: boolean): Promise<void> => {
+    if (!activeProvider || selectedProviderModels.length === 0) return
     await Promise.all(selectedProviderModels.map((model) => toggleModel(model.id, enabled)))
   }
 
-  const handleToggleModel = async (modelId: string, enabled: boolean) => {
+  const handleToggleModel = async (modelId: string, enabled: boolean): Promise<void> => {
     await toggleModel(modelId, enabled)
   }
 
-  const handleTestProvider = async () => {
-    if (!selectedProvider || selectedProviderModels.length === 0) return
+  const handleTestProvider = async (): Promise<void> => {
+    if (!activeProvider || selectedProviderModels.length === 0) return
 
     if (isDirty) {
       const saved = await handleSaveProviderConfig()
@@ -199,9 +195,9 @@ export function AppSettings({ open, onOpenChange }: AppSettingsProps) {
       selectedProviderModels.find((model) => model.enabled) || selectedProviderModels[0]
     if (!targetModel) return
 
-    setTestingProvider(selectedProvider)
+    setTestingProvider(activeProvider)
     const result = await testModel(targetModel.id)
-    setProviderTestResults((prev) => ({ ...prev, [selectedProvider]: result }))
+    setProviderTestResults((prev) => ({ ...prev, [activeProvider]: result }))
     setTestingProvider(null)
   }
 
@@ -327,10 +323,15 @@ export function AppSettings({ open, onOpenChange }: AppSettingsProps) {
                       visibleProviders.map((provider) => (
                         <button
                           key={provider.provider}
-                          onClick={() => setSelectedProvider(provider.provider)}
+                          onClick={() => {
+                            setSelectedProvider(provider.provider)
+                            setApiKeyDraft('')
+                            setBaseURLDraft('')
+                            setIsDirty(false)
+                          }}
                           className={cn(
                             'w-full text-left border rounded-lg p-3 transition-colors',
-                            selectedProvider === provider.provider
+                            activeProvider === provider.provider
                               ? 'border-primary bg-primary/5'
                               : 'hover:bg-accent/40'
                           )}
@@ -363,182 +364,188 @@ export function AppSettings({ open, onOpenChange }: AppSettingsProps) {
               {/* 右：Provider 配置 + 模型列表 */}
               <div className="lg:col-span-8 border rounded-lg overflow-hidden min-h-0">
                 <div className="h-full overflow-y-auto p-4">
-                  {!selectedProvider || !selectedProviderSummary ? (
+                  {!activeProvider || !selectedProviderSummary ? (
                     <div className="h-full min-h-[320px] flex items-center justify-center text-sm text-muted-foreground">
                       请选择一个提供商进行配置
                     </div>
                   ) : (
                     <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-semibold">{selectedProviderSummary.label}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedProviderSummary.total} 个模型，已启用{' '}
-                          {selectedProviderSummary.enabled} 个
-                        </p>
-                        <div className="mt-2">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                            {selectedProvider}
-                          </span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold">{selectedProviderSummary.label}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {selectedProviderSummary.total} 个模型，已启用{' '}
+                            {selectedProviderSummary.enabled} 个
+                          </p>
+                          <div className="mt-2">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                              {activeProvider}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleProvider(false)}
+                            disabled={selectedProviderSummary.enabled === 0}
+                          >
+                            全部禁用
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleToggleProvider(true)}
+                            disabled={
+                              selectedProviderSummary.enabled === selectedProviderSummary.total
+                            }
+                          >
+                            全部启用
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleProvider(false)}
-                          disabled={selectedProviderSummary.enabled === 0}
-                        >
-                          全部禁用
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleToggleProvider(true)}
-                          disabled={selectedProviderSummary.enabled === selectedProviderSummary.total}
-                        >
-                          全部启用
-                        </Button>
-                      </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Provider API Key</label>
-                      <Input
-                        type="password"
-                        value={apiKeyDraft}
-                        onChange={(e) => {
-                          setApiKeyDraft(e.target.value)
-                          setIsDirty(true)
-                        }}
-                        placeholder="输入 API Key"
-                      />
-                    </div>
-
-                    {(selectedProvider === 'openai' || selectedProvider === 'deepseek') && (
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Provider Base URL (可选)</label>
+                        <label className="text-sm font-medium">Provider API Key</label>
                         <Input
-                          type="text"
-                          value={baseURLDraft}
+                          type="password"
+                          value={visibleApiKeyDraft}
                           onChange={(e) => {
-                            setBaseURLDraft(e.target.value)
+                            setApiKeyDraft(e.target.value)
                             setIsDirty(true)
                           }}
-                          placeholder={
-                            selectedProvider === 'openai'
-                              ? 'https://api.openai.com/v1'
-                              : 'https://api.deepseek.com'
+                          placeholder="输入 API Key"
+                        />
+                      </div>
+
+                      {(activeProvider === 'openai' || activeProvider === 'deepseek') && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Provider Base URL (可选)</label>
+                          <Input
+                            type="text"
+                            value={visibleBaseURLDraft}
+                            onChange={(e) => {
+                              setBaseURLDraft(e.target.value)
+                              setIsDirty(true)
+                            }}
+                            placeholder={
+                              activeProvider === 'openai'
+                                ? 'https://api.openai.com/v1'
+                                : 'https://api.deepseek.com'
+                            }
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          onClick={handleSaveProviderConfig}
+                          disabled={!isDirty || isSaving}
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              保存中...
+                            </>
+                          ) : isDirty ? (
+                            '保存配置'
+                          ) : (
+                            '已保存'
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!isDirty || isSaving}
+                          onClick={handleResetDraft}
+                        >
+                          重置
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleTestProvider}
+                          disabled={
+                            testingProvider === activeProvider || !visibleApiKeyDraft.trim()
                           }
-                        />
+                        >
+                          {testingProvider === activeProvider ? '测试中...' : '测试连接'}
+                        </Button>
                       </div>
-                    )}
 
-                    <div className="flex flex-wrap items-center gap-2 pt-2">
-                      <Button
-                        size="sm"
-                        onClick={handleSaveProviderConfig}
-                        disabled={!isDirty || isSaving}
-                      >
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            保存中...
-                          </>
-                        ) : isDirty ? (
-                          '保存配置'
-                        ) : (
-                          '已保存'
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!isDirty || isSaving}
-                        onClick={handleResetDraft}
-                      >
-                        重置
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleTestProvider}
-                        disabled={testingProvider === selectedProvider || !apiKeyDraft.trim()}
-                      >
-                        {testingProvider === selectedProvider ? '测试中...' : '测试连接'}
-                      </Button>
-                    </div>
+                      {providerDraftDefaults.hasInconsistentProviderConfig && (
+                        <div className="text-xs rounded-md px-3 py-2 bg-amber-50 text-amber-700">
+                          当前 Provider 下模型配置不一致，保存后会统一覆盖为当前值。
+                        </div>
+                      )}
 
-                    {hasInconsistentProviderConfig && (
-                      <div className="text-xs rounded-md px-3 py-2 bg-amber-50 text-amber-700">
-                        当前 Provider 下模型配置不一致，保存后会统一覆盖为当前值。
-                      </div>
-                    )}
+                      {activeProvider && providerTestResults[activeProvider] && (
+                        <div
+                          className={cn(
+                            'flex items-center gap-2 text-sm rounded-md px-3 py-2',
+                            providerTestResults[activeProvider].success
+                              ? 'bg-green-50 text-green-700'
+                              : 'bg-red-50 text-red-700'
+                          )}
+                        >
+                          {providerTestResults[activeProvider].success ? (
+                            <CheckCircle2 className="w-4 h-4" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4" />
+                          )}
+                          <span>
+                            {providerTestResults[activeProvider].success
+                              ? '连接成功'
+                              : providerTestResults[activeProvider].error || '连接失败'}
+                          </span>
+                        </div>
+                      )}
 
-                    {providerTestResults[selectedProvider] && (
-                      <div
-                        className={cn(
-                          'flex items-center gap-2 text-sm rounded-md px-3 py-2',
-                          providerTestResults[selectedProvider].success
-                            ? 'bg-green-50 text-green-700'
-                            : 'bg-red-50 text-red-700'
-                        )}
-                      >
-                        {providerTestResults[selectedProvider].success ? (
-                          <CheckCircle2 className="w-4 h-4" />
-                        ) : (
-                          <AlertCircle className="w-4 h-4" />
-                        )}
-                        <span>
-                          {providerTestResults[selectedProvider].success
-                            ? '连接成功'
-                            : providerTestResults[selectedProvider].error || '连接失败'}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="pt-2 border-t space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium">Models</p>
-                        <span className="text-xs text-muted-foreground">
-                          显示 {visibleModels.length}/{selectedProviderModels.length}
-                        </span>
-                      </div>
-                      <div className="relative">
-                        <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                        <Input
-                          value={modelSearchQuery}
-                          onChange={(e) => setModelSearchQuery(e.target.value)}
-                          placeholder="搜索 models..."
-                          className="pl-9"
-                        />
-                      </div>
-                      <div className="border rounded-lg overflow-hidden">
-                        {visibleModels.length === 0 ? (
-                          <div className="text-sm text-muted-foreground text-center py-8">
-                            未找到匹配模型
-                          </div>
-                        ) : (
-                          visibleModels.map((model) => (
-                            <div
-                              key={model.id}
-                              className="px-3 py-2.5 border-b last:border-b-0 flex items-center justify-between gap-3"
-                            >
-                              <div className="min-w-0">
-                                <p className="font-medium truncate">{model.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{model.model}</p>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant={model.enabled ? 'default' : 'outline'}
-                                onClick={() => handleToggleModel(model.id, !model.enabled)}
-                              >
-                                {model.enabled ? '已启用' : '已禁用'}
-                              </Button>
+                      <div className="pt-2 border-t space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">Models</p>
+                          <span className="text-xs text-muted-foreground">
+                            显示 {visibleModels.length}/{selectedProviderModels.length}
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                          <Input
+                            value={modelSearchQuery}
+                            onChange={(e) => setModelSearchQuery(e.target.value)}
+                            placeholder="搜索 models..."
+                            className="pl-9"
+                          />
+                        </div>
+                        <div className="border rounded-lg overflow-hidden">
+                          {visibleModels.length === 0 ? (
+                            <div className="text-sm text-muted-foreground text-center py-8">
+                              未找到匹配模型
                             </div>
-                          ))
-                        )}
+                          ) : (
+                            visibleModels.map((model) => (
+                              <div
+                                key={model.id}
+                                className="px-3 py-2.5 border-b last:border-b-0 flex items-center justify-between gap-3"
+                              >
+                                <div className="min-w-0">
+                                  <p className="font-medium truncate">{model.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {model.model}
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant={model.enabled ? 'default' : 'outline'}
+                                  onClick={() => handleToggleModel(model.id, !model.enabled)}
+                                >
+                                  {model.enabled ? '已启用' : '已禁用'}
+                                </Button>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
-                    </div>
                     </div>
                   )}
                 </div>

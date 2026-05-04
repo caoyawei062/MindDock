@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { aiConfigManager } from './config'
 import { aiService } from './index'
-import { AIMessage, AIModelConfig } from './types'
+import { AIMessage, AIModelConfig, AICompletionOptions, AIProvider } from './types'
 
 /**
  * AI 相关的 IPC 通道名称
@@ -17,6 +17,7 @@ export const AI_IPC_CHANNELS = {
 
   // AI 功能
   STREAM_COMPLETION: 'ai:completion:stream',
+  CANCEL_STREAM: 'ai:completion:cancel',
   GENERATE_COMPLETION: 'ai:completion:generate',
   TEST_MODEL: 'ai:model:test'
 } as const
@@ -53,8 +54,8 @@ export function registerAIIPC(): void {
   })
 
   // 根据提供商获取模型
-  ipcMain.handle(AI_IPC_CHANNELS.GET_MODELS_BY_PROVIDER, (_, provider: string) => {
-    return aiConfigManager.getModelsByProvider(provider as any)
+  ipcMain.handle(AI_IPC_CHANNELS.GET_MODELS_BY_PROVIDER, (_, provider: AIProvider) => {
+    return aiConfigManager.getModelsByProvider(provider)
   })
 
   // ========== AI 功能 ==========
@@ -66,19 +67,14 @@ export function registerAIIPC(): void {
       _event,
       modelId: string,
       messages: AIMessage[],
-      options: any,
+      options: Partial<AICompletionOptions>,
       sessionId: string
     ) => {
       try {
-        await aiService.streamCompletion(
-          modelId,
-          messages,
-          options,
-          (chunk: string) => {
-            // 发送流式数据到渲染进程
-            _event.sender.send(`ai:stream:chunk:${sessionId}`, chunk)
-          }
-        )
+        await aiService.streamCompletion(sessionId, modelId, messages, options, (chunk: string) => {
+          // 发送流式数据到渲染进程
+          _event.sender.send(`ai:stream:chunk:${sessionId}`, chunk)
+        })
         // 发送完成信号
         _event.sender.send(`ai:stream:complete:${sessionId}`)
         return { success: true }
@@ -90,10 +86,19 @@ export function registerAIIPC(): void {
     }
   )
 
+  ipcMain.handle(AI_IPC_CHANNELS.CANCEL_STREAM, (_event, sessionId: string) => {
+    return { success: aiService.cancelStream(sessionId) }
+  })
+
   // 一次性生成文本
   ipcMain.handle(
     AI_IPC_CHANNELS.GENERATE_COMPLETION,
-    async (_event, modelId: string, messages: AIMessage[], options: any) => {
+    async (
+      _event,
+      modelId: string,
+      messages: AIMessage[],
+      options: Partial<AICompletionOptions>
+    ) => {
       try {
         const result = await aiService.generateCompletion(modelId, messages, options)
         return { success: true, data: result }

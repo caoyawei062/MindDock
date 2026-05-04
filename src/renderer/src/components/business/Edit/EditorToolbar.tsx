@@ -42,7 +42,7 @@ const ToolbarButton = ({
   isActive?: boolean
   children: React.ReactNode
   tooltip?: string
-}) => (
+}): React.JSX.Element => (
   <Tooltip>
     <TooltipTrigger asChild>
       <button
@@ -64,7 +64,7 @@ const ToolbarButton = ({
   </Tooltip>
 )
 
-const ToolbarDivider = () => <div className="w-px h-5 bg-border mx-1 shrink-0" />
+const ToolbarDivider = (): React.JSX.Element => <div className="w-px h-5 bg-border mx-1 shrink-0" />
 
 const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -72,7 +72,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
   const [codeBlockLanguage, setCodeBlockLanguage] = useState('plaintext')
 
   useEffect(() => {
-    const updateSelection = () => {
+    const updateSelection = (): void => {
       const { from, to } = editor.state.selection
       lastSelectionRef.current = { from, to }
     }
@@ -85,7 +85,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
   }, [editor])
 
   useEffect(() => {
-    const updateLanguage = () => {
+    const updateLanguage = (): void => {
       const attrs = editor.getAttributes('codeBlock') as { language?: string }
       setCodeBlockLanguage(attrs?.language || 'plaintext')
     }
@@ -104,7 +104,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
     []
   )
 
-  const chainWithSelection = () => {
+  const chainWithSelection = (): ReturnType<Editor['chain']> => {
     const chain = editor.chain().focus()
     const selection = lastSelectionRef.current
     if (selection) {
@@ -114,7 +114,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
   }
 
   // 处理图片选择
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0]
     if (!file) return
 

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ThemeProvider } from './provider/ThemeProvider'
+import { I18nProvider } from './provider/I18nProvider'
 import App from './App'
 import TrayWindow from './components/business/TrayWindow'
 import SettingsWindow from './components/business/SettingsWindow'
@@ -13,8 +14,10 @@ const isSettingsWindow = window.location.hash === '#/settings'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      {isTrayWindow ? <TrayWindow /> : isSettingsWindow ? <SettingsWindow /> : <App />}
-    </ThemeProvider>
+    <I18nProvider defaultLocale="zh-CN" storageKey="minddock-locale">
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        {isTrayWindow ? <TrayWindow /> : isSettingsWindow ? <SettingsWindow /> : <App />}
+      </ThemeProvider>
+    </I18nProvider>
   </StrictMode>
 )

@@ -13,13 +13,13 @@ export default defineConfig({
     }
   },
   preload: {
-    build:{
-      rollupOptions:{
+    build: {
+      rollupOptions: {
         external: ['better-sqlite3']
       }
     }
   },
-  renderer: {  
+  renderer: {
     optimizeDeps: {
       exclude: ['better-sqlite3']
     },
