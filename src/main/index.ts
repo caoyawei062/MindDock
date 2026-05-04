@@ -228,7 +228,7 @@ function createSettingsWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   if (process.platform === 'darwin') {
-    app.dock.setIcon(nativeImage.createFromPath(icon))
+    app.dock?.setIcon(nativeImage.createFromPath(icon))
   }
 
   // Set app user model id for windows
