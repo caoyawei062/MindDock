@@ -4,6 +4,7 @@ import {
   BrowserWindow,
   ipcMain,
   nativeTheme,
+  nativeImage,
   Menu,
   type MenuItemConstructorOptions
 } from 'electron'
@@ -226,6 +227,10 @@ function createSettingsWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  if (process.platform === 'darwin') {
+    app.dock.setIcon(nativeImage.createFromPath(icon))
+  }
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
