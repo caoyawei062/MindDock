@@ -13,7 +13,8 @@ const Tiptap: React.FC = () => {
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-sm dark:prose-invert max-w-none w-full focus:outline-none min-h-full px-6 py-4'
+        class:
+          'prose prose-sm dark:prose-invert max-w-none w-full focus:outline-none min-h-full px-6 py-4'
       }
     },
     onUpdate: () => {

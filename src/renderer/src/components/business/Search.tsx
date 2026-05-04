@@ -3,9 +3,12 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group'
 import { Keyboard, PenLine, SearchIcon, X } from 'lucide-react'
 import { Button } from '../ui/button'
 import { useList } from '@renderer/provider/ListProvider'
+import { useI18n } from '@renderer/provider/I18nProvider'
 
 const Search: React.FC = () => {
-  const { createNote, filterType, setFilterType, searchQuery, setSearchQuery, filteredNotes } = useList()
+  const { createNote, filterType, setFilterType, searchQuery, setSearchQuery, filteredNotes } =
+    useList()
+  const { t } = useI18n()
   const searchInputRef = React.useRef<HTMLInputElement>(null)
 
   const handleCreateDocument = React.useCallback(async () => {
@@ -22,7 +25,7 @@ const Search: React.FC = () => {
     await createNote({ type: 'snippet', title: '', language: 'javascript' })
   }, [createNote, filterType, setFilterType])
 
-  const clearSearch = () => {
+  const clearSearch = (): void => {
     setSearchQuery('')
   }
 
@@ -44,7 +47,7 @@ const Search: React.FC = () => {
       <InputGroup>
         <InputGroupInput
           ref={searchInputRef}
-          placeholder="搜索标题、内容或标签..."
+          placeholder={t('search.placeholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -53,7 +56,7 @@ const Search: React.FC = () => {
             <button
               onClick={clearSearch}
               className="hover:bg-accent rounded-full p-0.5 transition-colors"
-              title="清除搜索"
+              title={t('search.clear')}
             >
               <X size={14} />
             </button>
@@ -66,7 +69,7 @@ const Search: React.FC = () => {
       {/* 搜索结果提示 */}
       {searchQuery && (
         <div className="mt-2 text-xs text-muted-foreground">
-          找到 {filteredNotes.length} 个结果
+          {t('search.results', { count: filteredNotes.length })}
         </div>
       )}
 
@@ -74,14 +77,14 @@ const Search: React.FC = () => {
         <div className="w-[calc(50%-8px)]">
           <Button className="w-full" onClick={handleCreateDocument}>
             <PenLine />
-            文档
+            {t('search.createDocument')}
           </Button>
         </div>
         <div className="w-4"></div>
         <div className="w-[calc(50%-8px)]">
           <Button variant="outline" className="w-full" onClick={handleCreateSnippet}>
             <Keyboard />
-            代码
+            {t('search.createCode')}
           </Button>
         </div>
       </div>

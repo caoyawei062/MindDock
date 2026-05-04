@@ -16,10 +16,7 @@ interface AIAssistantProps {
   onInsert?: (text: string) => void
 }
 
-export function AIAssistant({
-  className,
-  onInsert
-}: AIAssistantProps): React.JSX.Element {
+export function AIAssistant({ className, onInsert }: AIAssistantProps): React.JSX.Element {
   const [models, setModels] = useState<AIModelConfig[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [messages, setMessages] = useState<AIMessage[]>([])
@@ -73,10 +70,7 @@ export function AIAssistant({
     }
 
     const onComplete = (): void => {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: responseRef.current }
-      ])
+      setMessages((prev) => [...prev, { role: 'assistant', content: responseRef.current }])
     }
 
     try {
@@ -89,12 +83,7 @@ export function AIAssistant({
         setResponse(`Error: ${error}`)
       })
 
-      await window.api.aiStreamCompletion(
-        selectedModel,
-        newMessages,
-        {},
-        sessionId
-      )
+      await window.api.aiStreamCompletion(selectedModel, newMessages, {}, sessionId)
 
       // Cleanup listeners
       unsubscribeChunk()
@@ -151,10 +140,9 @@ export function AIAssistant({
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-3 ${message.role === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-800'
-                }`}
+              className={`max-w-[80%] rounded-lg p-3 ${
+                message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800'
+              }`}
             >
               <p className="whitespace-pre-wrap">{message.content}</p>
             </div>

@@ -47,10 +47,14 @@ export function getAllFolders(): Folder[] {
  */
 export function getFolderTree(): Folder[] {
   const db = getDatabase()
-  const folders = db.prepare(`
+  const folders = db
+    .prepare(
+      `
     SELECT * FROM folders
     ORDER BY sort_order ASC, created_at ASC
-  `).all() as Folder[]
+  `
+    )
+    .all() as Folder[]
 
   // 构建树形结构
   const folderMap = new Map<string, Folder & { children: Folder[] }>()

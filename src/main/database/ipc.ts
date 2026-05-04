@@ -11,18 +11,13 @@ import {
   deleteNote,
   getTrashedNotes,
   getTrashedNotesWithTags,
-  searchNotes,
+  searchNotesWithTags,
   togglePinNote,
   getSnippetsForTray,
   CreateNoteParams,
   UpdateNoteParams
 } from './notes'
-import {
-  getAllExports,
-  createExportRecord,
-  deleteExport,
-  cleanOldExports
-} from './exports'
+import { getAllExports, createExportRecord, deleteExport, cleanOldExports } from './exports'
 import {
   getAllTags,
   getTagById,
@@ -98,10 +93,13 @@ function getSnippetFileExtension(language: string | null): string {
 }
 
 function sanitizeFileName(name: string): string {
-  return (name || 'untitled')
-    .trim()
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+  const safeName = Array.from((name || 'untitled').trim())
+    .map((char) => (char.charCodeAt(0) < 32 ? '_' : char))
+    .join('')
+    .replace(/[<>:"/\\|?*]/g, '_')
     .replace(/\s+/g, ' ')
+
+  return safeName || 'untitled'
 }
 
 /**
@@ -163,7 +161,7 @@ export function registerDatabaseIPC(): void {
 
   // 搜索笔记
   ipcMain.handle('db:notes:search', (_, query: string, type?: 'document' | 'snippet') => {
-    return searchNotes(query, type)
+    return searchNotesWithTags(query, type)
   })
 
   // 置顶/取消置顶
@@ -335,9 +333,8 @@ export function registerDatabaseIPC(): void {
     }
 
     // 根据类型生成不同的默认文件名
-    const defaultFileName = note.type === 'snippet'
-      ? `${note.title}.${note.language || 'md'}`
-      : `${note.title}.md`
+    const defaultFileName =
+      note.type === 'snippet' ? `${note.title}.${note.language || 'md'}` : `${note.title}.md`
 
     // 让用户选择保存路径
     const result = await dialog.showSaveDialog({

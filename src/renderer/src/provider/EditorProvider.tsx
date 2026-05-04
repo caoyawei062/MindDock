@@ -221,15 +221,29 @@ export function EditorProvider({ children }: EditorProviderProps): React.JSX.Ele
       getCodeDocument,
       replaceCodeDocument
     }),
-    [aiPanelOpen, toggleAiPanel, setAIInputText, getAIInputText, clearAIInputText, setAIContextText, getAIContextText, clearAIContextText, setCodeSelectionText, getCodeSelectionText, clearCodeSelectionText, setCodeEditorView, getCodeEditorView, getCodeDocument, replaceCodeDocument]
+    [
+      aiPanelOpen,
+      toggleAiPanel,
+      setAIInputText,
+      getAIInputText,
+      clearAIInputText,
+      setAIContextText,
+      getAIContextText,
+      clearAIContextText,
+      setCodeSelectionText,
+      getCodeSelectionText,
+      clearCodeSelectionText,
+      setCodeEditorView,
+      getCodeEditorView,
+      getCodeDocument,
+      replaceCodeDocument
+    ]
   )
 
   return (
     <EditorCoreContext.Provider value={coreValue}>
       <OutlineContext.Provider value={outlineValue}>
-        <AIPanelContext.Provider value={aiValue}>
-          {children}
-        </AIPanelContext.Provider>
+        <AIPanelContext.Provider value={aiValue}>{children}</AIPanelContext.Provider>
       </OutlineContext.Provider>
     </EditorCoreContext.Provider>
   )

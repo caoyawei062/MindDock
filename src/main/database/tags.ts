@@ -64,10 +64,12 @@ export function createTag(params: { name: string; color?: string }): Tag {
     created_at: now
   }
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO tags (id, name, color, created_at)
     VALUES (?, ?, ?, ?)
-  `).run(tag.id, tag.name, tag.color, tag.created_at)
+  `
+  ).run(tag.id, tag.name, tag.color, tag.created_at)
 
   return tag
 }
@@ -158,10 +160,12 @@ export function addTagToNote(noteId: string, tagId: string): void {
     return // 已经存在,不重复添加
   }
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO note_tags (note_id, tag_id, created_at)
     VALUES (?, ?, ?)
-  `).run(noteId, tagId, now)
+  `
+  ).run(noteId, tagId, now)
 }
 
 /**
@@ -169,10 +173,9 @@ export function addTagToNote(noteId: string, tagId: string): void {
  */
 export function removeTagFromNote(noteId: string, tagId: string): boolean {
   const db = getDatabase()
-  const result = db.prepare('DELETE FROM note_tags WHERE note_id = ? AND tag_id = ?').run(
-    noteId,
-    tagId
-  )
+  const result = db
+    .prepare('DELETE FROM note_tags WHERE note_id = ? AND tag_id = ?')
+    .run(noteId, tagId)
   return result.changes > 0
 }
 

@@ -57,13 +57,16 @@ export function AISettings({ open, onOpenChange }: AISettingsProps): React.JSX.E
     setTestingModel(null)
   }
 
-  const groupedModels = models.reduce((acc, model) => {
-    if (!acc[model.provider]) {
-      acc[model.provider] = []
-    }
-    acc[model.provider].push(model)
-    return acc
-  }, {} as Record<AIProvider, AIModelConfig[]>)
+  const groupedModels = models.reduce(
+    (acc, model) => {
+      if (!acc[model.provider]) {
+        acc[model.provider] = []
+      }
+      acc[model.provider].push(model)
+      return acc
+    },
+    {} as Record<AIProvider, AIModelConfig[]>
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

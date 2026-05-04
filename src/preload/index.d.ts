@@ -97,7 +97,7 @@ interface AIGenerateResponse {
   error?: string
 }
 
-interface API {
+export interface API {
   changeTheme: (theme: THEME) => void
   updateTraySnippets: (snippets: CodeSnippet[]) => void
   onSnippetCopied: (callback: (title: string) => void) => () => void
@@ -113,7 +113,10 @@ interface API {
 
   // 数据库 API
   notesGetAll: (type?: 'document' | 'snippet', folderId?: string) => Promise<Note[]>
-  notesGetAllWithTags: (type?: 'document' | 'snippet', folderId?: string) => Promise<(Note & { tags: Tag[] })[]>
+  notesGetAllWithTags: (
+    type?: 'document' | 'snippet',
+    folderId?: string
+  ) => Promise<(Note & { tags: Tag[] })[]>
   notesGetTrashedWithTags: () => Promise<(Note & { tags: Tag[] })[]>
   notesGetById: (id: string) => Promise<Note | null>
   notesCreate: (params: {
@@ -125,7 +128,13 @@ interface API {
   }) => Promise<Note>
   notesUpdate: (
     id: string,
-    params: { title?: string; content?: string; language?: string; is_pinned?: number }
+    params: {
+      title?: string
+      content?: string
+      language?: string
+      is_pinned?: number
+      is_favorite?: number
+    }
   ) => Promise<Note | null>
   notesTrash: (id: string) => Promise<boolean>
   notesRestore: (id: string) => Promise<boolean>

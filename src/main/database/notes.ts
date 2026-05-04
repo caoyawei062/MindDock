@@ -100,13 +100,15 @@ export function createNote(params: CreateNoteParams = {}): Note {
     trashed_at: null
   }
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO notes (
       id, title, content, type, language, folder_id,
       is_pinned, is_trashed, is_favorite, sort_order, word_count,
       created_at, updated_at, trashed_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `
+  ).run(
     note.id,
     note.title,
     note.content,
@@ -142,7 +144,8 @@ export function updateNote(id: string, params: UpdateNoteParams): Note | null {
     updated_at: new Date().toISOString()
   }
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE notes SET
       title = ?,
       content = ?,
@@ -154,7 +157,8 @@ export function updateNote(id: string, params: UpdateNoteParams): Note | null {
       word_count = ?,
       updated_at = ?
     WHERE id = ?
-  `).run(
+  `
+  ).run(
     updated.title,
     updated.content,
     updated.language,
@@ -305,6 +309,15 @@ export function searchNotes(query: string, type?: 'document' | 'snippet'): Note[
 }
 
 /**
+ * 搜索笔记（带标签）
+ */
+export function searchNotesWithTags(query: string, type?: 'document' | 'snippet'): NoteWithTags[] {
+  const notes = searchNotes(query, type)
+  const tagsMap = getTagsByNoteIds(notes.map((note) => note.id))
+  return notes.map((note) => ({ ...note, tags: tagsMap.get(note.id) || [] }))
+}
+
+/**
  * 置顶/取消置顶笔记
  */
 export function togglePinNote(id: string): Note | null {
@@ -407,6 +420,7 @@ export default {
   getTrashedNotes,
   getTrashedNotesWithTags,
   searchNotes,
+  searchNotesWithTags,
   togglePinNote,
   getSnippetsForTray,
   getTagsByNoteIds

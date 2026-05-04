@@ -32,11 +32,7 @@ const hasChildren = (items: OutlineItem[], index: number): boolean => {
 /**
  * 判断某个 item 是否因为祖先折叠而被隐藏
  */
-const isItemVisible = (
-  items: OutlineItem[],
-  index: number,
-  collapsedSet: Set<string>
-): boolean => {
+const isItemVisible = (items: OutlineItem[], index: number, collapsedSet: Set<string>): boolean => {
   const currentLevel = items[index].level
   // 向前查找所有祖先，检查是否有被折叠的
   for (let i = index - 1; i >= 0; i--) {

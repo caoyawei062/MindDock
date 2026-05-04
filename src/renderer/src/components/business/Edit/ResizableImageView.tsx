@@ -121,56 +121,59 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
     [getEditorMaxWidth, updateAttributes]
   )
 
-  const handleMouseDown = useCallback((e: React.MouseEvent, direction: 'se' | 'e' | 's') => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent, direction: 'se' | 'e' | 's') => {
+      e.preventDefault()
+      e.stopPropagation()
 
-    const startX = e.clientX
-    const startY = e.clientY
-    const startWidth = imageRef.current?.offsetWidth || naturalSize.width || 300
-    const startHeight = imageRef.current?.offsetHeight || naturalSize.height || 200
-    const aspectRatio = startHeight / startWidth || getAspectRatio()
+      const startX = e.clientX
+      const startY = e.clientY
+      const startWidth = imageRef.current?.offsetWidth || naturalSize.width || 300
+      const startHeight = imageRef.current?.offsetHeight || naturalSize.height || 200
+      const aspectRatio = startHeight / startWidth || getAspectRatio()
 
-    const handleMouseMove = (moveEvent: MouseEvent): void => {
-      const deltaX = moveEvent.clientX - startX
-      const deltaY = moveEvent.clientY - startY
+      const handleMouseMove = (moveEvent: MouseEvent): void => {
+        const deltaX = moveEvent.clientX - startX
+        const deltaY = moveEvent.clientY - startY
 
-      let newWidth = startWidth
-      let newHeight = startHeight
+        let newWidth = startWidth
+        let newHeight = startHeight
 
-      if (direction === 'se' || direction === 'e') {
-        newWidth = Math.max(MIN_SIZE, startWidth + deltaX)
-        newHeight = Math.round(newWidth * aspectRatio)
-      }
-      if (direction === 'se' || direction === 's') {
-        newHeight = Math.max(MIN_SIZE, startHeight + deltaY)
-        newWidth = Math.round(newHeight / aspectRatio)
-      }
+        if (direction === 'se' || direction === 'e') {
+          newWidth = Math.max(MIN_SIZE, startWidth + deltaX)
+          newHeight = Math.round(newWidth * aspectRatio)
+        }
+        if (direction === 'se' || direction === 's') {
+          newHeight = Math.max(MIN_SIZE, startHeight + deltaY)
+          newWidth = Math.round(newHeight / aspectRatio)
+        }
 
-      // 使用临时状态，避免频繁更新 DOM
-      const nextSize = clampSize({ width: newWidth, height: newHeight }, getEditorMaxWidth())
-      tempSizeRef.current = nextSize
-      setTempSize(nextSize)
-    }
-
-    const handleMouseUp = (): void => {
-      // 只在鼠标释放时更新真实属性
-      if (tempSizeRef.current) {
-        updateAttributes({
-          width: tempSizeRef.current.width,
-          height: tempSizeRef.current.height
-        })
+        // 使用临时状态，避免频繁更新 DOM
+        const nextSize = clampSize({ width: newWidth, height: newHeight }, getEditorMaxWidth())
+        tempSizeRef.current = nextSize
+        setTempSize(nextSize)
       }
 
-      setTempSize(null)
-      tempSizeRef.current = null
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
+      const handleMouseUp = (): void => {
+        // 只在鼠标释放时更新真实属性
+        if (tempSizeRef.current) {
+          updateAttributes({
+            width: tempSizeRef.current.width,
+            height: tempSizeRef.current.height
+          })
+        }
 
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-  }, [getAspectRatio, getEditorMaxWidth, naturalSize.height, naturalSize.width, updateAttributes])
+        setTempSize(null)
+        tempSizeRef.current = null
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+    },
+    [getAspectRatio, getEditorMaxWidth, naturalSize.height, naturalSize.width, updateAttributes]
+  )
 
   const handleApplyDraftSize = useCallback((): void => {
     const nextWidth = Number.parseInt(widthInputRef.current?.value || '', 10)

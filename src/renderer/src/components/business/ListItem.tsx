@@ -1,6 +1,7 @@
+/* eslint-disable react/prop-types */
 import React, { memo, useState } from 'react'
-import { File, Tag, CodeXml, Pin, Trash2, MoreVertical } from 'lucide-react'
-import { Note } from '@renderer/provider/ListProvider'
+import { File, Tag, CodeXml, Pin, Trash2, MoreVertical, Star } from 'lucide-react'
+import { FilterType, Note } from '@renderer/provider/ListProvider'
 import {
   Dialog,
   DialogContent,
@@ -17,12 +18,13 @@ import {
   DropdownMenuTrigger
 } from '@renderer/components/ui/dropdown-menu'
 import { useList } from '@renderer/provider/ListProvider'
+import { useI18n } from '@renderer/provider/I18nProvider'
 
 interface ListItemProps {
   note: Note
   isSelected: boolean
   onSelect: (note: Note) => void
-  filterType: 'all' | 'document' | 'snippet' | 'trash'
+  filterType: FilterType
 }
 // 语言映射简写
 const languageMap: { [key: string]: string } = {
@@ -43,7 +45,7 @@ const languageMap: { [key: string]: string } = {
   sql: 'SQL'
 }
 
-const stripHtml = (html: string) => {
+const stripHtml = (html: string): string => {
   return html
     .replace(/<img\b[^>]*>/gi, '[图片]')
     .replace(/<[^>]*>/g, '')
@@ -54,40 +56,46 @@ const stripHtml = (html: string) => {
 
 const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, filterType }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const { deleteNote, restoreNote } = useList()
+  const { deleteNote, restoreNote, updateNote } = useList()
+  const { localeTag, t } = useI18n()
 
   // 格式化时间
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     const date = new Date(dateString)
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
 
     if (days === 0) {
-      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      return date.toLocaleTimeString(localeTag, { hour: '2-digit', minute: '2-digit' })
     } else if (days === 1) {
-      return '昨天'
+      return t('listItem.yesterday')
     } else if (days < 7) {
-      return `${days}天前`
+      return t('listItem.daysAgo', { count: days })
     } else {
-      return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+      return date.toLocaleDateString(localeTag, { month: 'short', day: 'numeric' })
     }
   }
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (e: React.MouseEvent): void => {
     e.stopPropagation()
     onSelect(note)
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<void> => {
     const success = await deleteNote(note.id)
     if (success) {
       setDeleteDialogOpen(false)
     }
   }
 
-  const handleRestore = async () => {
+  const handleRestore = async (): Promise<void> => {
     await restoreNote(note.id)
+  }
+
+  const handleToggleFavorite = async (event: React.MouseEvent): Promise<void> => {
+    event.stopPropagation()
+    await updateNote(note.id, { is_favorite: note.is_favorite === 1 ? 0 : 1 })
   }
 
   return (
@@ -95,22 +103,26 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{filterType === 'trash' ? '彻底删除笔记' : '移到废纸篓'}</DialogTitle>
+            <DialogTitle>
+              {filterType === 'trash'
+                ? t('listItem.deleteDialog.trashTitle')
+                : t('listItem.deleteDialog.defaultTitle')}
+            </DialogTitle>
             <DialogDescription>
               {filterType === 'trash'
-                ? '此操作将永久删除该笔记,无法恢复。确定要继续吗?'
-                : '该笔记将被移到废纸篓,可以在废纸篓中恢复或彻底删除。'}
+                ? t('listItem.deleteDialog.trashDescription')
+                : t('listItem.deleteDialog.defaultDescription')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button
               variant={filterType === 'trash' ? 'destructive' : 'default'}
               onClick={handleDelete}
             >
-              {filterType === 'trash' ? '彻底删除' : '移到废纸篓'}
+              {filterType === 'trash' ? t('common.deleteForever') : t('common.moveToTrash')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -118,10 +130,11 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
 
       <div
         onClick={handleClick}
-        className={`w-full mx-2 my-1 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${isSelected
+        className={`w-full mx-2 my-1 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
+          isSelected
             ? 'bg-primary/10 border border-primary/30 shadow-sm'
             : 'bg-card/50 border border-border/30 hover:bg-accent/50 hover:border-border/50'
-          }`}
+        }`}
         style={{ width: 'calc(100% - 16px)' }}
       >
         <div className="flex items-center gap-2 mb-1.5">
@@ -131,8 +144,22 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
             <File size={16} className="text-muted-foreground shrink-0" />
           )}
           <span className="font-medium text-sm truncate select-text flex-1">
-            {note.title || '无标题'}
+            {note.title || t('listItem.untitled')}
           </span>
+          {filterType !== 'trash' && (
+            <button
+              type="button"
+              onClick={handleToggleFavorite}
+              title={note.is_favorite === 1 ? t('common.unfavorite') : t('common.favorite')}
+              className={`h-6 w-6 rounded-md inline-flex items-center justify-center transition-colors ${
+                note.is_favorite === 1
+                  ? 'text-amber-500 hover:bg-amber-500/10'
+                  : 'text-muted-foreground hover:text-amber-500 hover:bg-accent'
+              }`}
+            >
+              <Star size={12} className={note.is_favorite === 1 ? 'fill-current' : undefined} />
+            </button>
+          )}
           {note.is_pinned === 1 && <Pin size={12} className="text-primary shrink-0" />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -143,23 +170,34 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
             <DropdownMenuContent align="end">
               {filterType === 'trash' ? (
                 <>
-                  <DropdownMenuItem onClick={handleRestore}>恢复笔记</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleRestore}>
+                    {t('common.restoreNote')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => setDeleteDialogOpen(true)}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 size={14} className="mr-2" />
-                    彻底删除
+                    {t('common.deleteForever')}
                   </DropdownMenuItem>
                 </>
               ) : (
-                <DropdownMenuItem
-                  onClick={() => setDeleteDialogOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 size={14} className="mr-2" />
-                  移到废纸篓
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem onClick={handleToggleFavorite}>
+                    <Star
+                      size={14}
+                      className={`mr-2 ${note.is_favorite === 1 ? 'fill-current text-amber-500' : ''}`}
+                    />
+                    {note.is_favorite === 1 ? t('common.unfavorite') : t('common.favorite')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setDeleteDialogOpen(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 size={14} className="mr-2" />
+                    {t('common.moveToTrash')}
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -173,7 +211,7 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
                   const plain = stripHtml(note.content)
                   return plain.substring(0, 80) + (plain.length > 80 ? '...' : '')
                 })()
-              : '暂无内容'}
+              : t('listItem.noContent')}
           </p>
         </div>
 

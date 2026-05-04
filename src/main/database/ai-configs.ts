@@ -62,9 +62,7 @@ export function getAIConfigsByProvider(provider: AIProvider): AIModelConfig[] {
  */
 export function getAIConfigById(id: string): AIModelConfig | undefined {
   const db = getDatabase()
-  const row = db.prepare('SELECT * FROM ai_configs WHERE id = ?').get(id) as
-    | AIConfigRow
-    | undefined
+  const row = db.prepare('SELECT * FROM ai_configs WHERE id = ?').get(id) as AIConfigRow | undefined
   return row ? rowToAIConfig(row) : undefined
 }
 

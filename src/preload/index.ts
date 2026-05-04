@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { CHANGETHEME, THEME } from '../constants/index'
+import type { API } from './index.d'
 import type {
   AICompletionOptions,
   AITaskOutputAcceptTarget,
@@ -22,8 +23,8 @@ interface CodeSnippet {
 
 type AppCommand = 'save-current-note' | 'new-document' | 'focus-search'
 
-// Custom APIs for renderer — typed via API interface for type safety across IPC boundary
-const api: import('./index').API = {
+// Custom APIs for renderer — typed via Window API interface for type safety across IPC boundary
+const api: API = {
   changeTheme: (theme: THEME) => {
     ipcRenderer.send(CHANGETHEME, theme)
   },
@@ -101,7 +102,13 @@ const api: import('./index').API = {
   // 更新笔记
   notesUpdate: (
     id: string,
-    params: { title?: string; content?: string; language?: string; is_pinned?: number }
+    params: {
+      title?: string
+      content?: string
+      language?: string
+      is_pinned?: number
+      is_favorite?: number
+    }
   ) => {
     return ipcRenderer.invoke('db:notes:update', id, params)
   },

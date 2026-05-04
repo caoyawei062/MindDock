@@ -20,7 +20,7 @@ export const ResizableImage = Node.extend({
       ...this.parent?.(),
       width: {
         default: null,
-        parseHTML: element => {
+        parseHTML: (element) => {
           const width = element.style.width
           return width ? parseInt(width, 10) : null
         },
@@ -31,7 +31,7 @@ export const ResizableImage = Node.extend({
       },
       height: {
         default: null,
-        parseHTML: element => {
+        parseHTML: (element) => {
           const height = element.style.height
           return height ? parseInt(height, 10) : null
         },

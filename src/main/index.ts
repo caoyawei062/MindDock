@@ -1,4 +1,12 @@
-import { app, shell, BrowserWindow, ipcMain, nativeTheme, Menu, type MenuItemConstructorOptions } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  nativeTheme,
+  Menu,
+  type MenuItemConstructorOptions
+} from 'electron'
 import { join } from 'path'
 import { execFile } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -24,24 +32,26 @@ function createAppMenu(): void {
 
   const template: MenuItemConstructorOptions[] = [
     ...(isMac
-      ? [{
-          label: app.name,
-          submenu: [
-            {
-              label: 'Settings',
-              accelerator: 'CmdOrCtrl+,',
-              click: () => createSettingsWindow()
-            },
-            { type: 'separator' as const },
-            { role: 'services' as const },
-            { type: 'separator' as const },
-            { role: 'hide' as const },
-            { role: 'hideOthers' as const },
-            { role: 'unhide' as const },
-            { type: 'separator' as const },
-            { role: 'quit' as const }
-          ]
-        }]
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              {
+                label: 'Settings',
+                accelerator: 'CmdOrCtrl+,',
+                click: () => createSettingsWindow()
+              },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ]
+          }
+        ]
       : []),
     {
       label: 'File',
@@ -90,11 +100,7 @@ function createAppMenu(): void {
     },
     {
       label: 'View',
-      submenu: [
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' }
-      ]
+      submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }]
     },
     {
       label: 'Window',

@@ -34,11 +34,13 @@ export function useAIStream(
   const sessionIdRef = useRef<string>('')
   const cleanupRef = useRef<(() => void)[]>([])
 
-  // 用 ref 保存最新的回调，避免 listener 持有过时闭包
   const onChunkRef: RefObject<(chunk: string) => void> = useRef(onChunk)
-  onChunkRef.current = onChunk
   const onCompleteRef: RefObject<(() => void) | undefined> = useRef(onComplete)
-  onCompleteRef.current = onComplete
+
+  useEffect(() => {
+    onChunkRef.current = onChunk
+    onCompleteRef.current = onComplete
+  }, [onChunk, onComplete])
 
   const stopStream = useCallback(() => {
     if (sessionIdRef.current) {
@@ -63,7 +65,6 @@ export function useAIStream(
         const sessionId = `stream-${Date.now()}-${Math.random()}`
         sessionIdRef.current = sessionId
 
-        // 通过 ref 间接调用，始终使用最新的回调
         const unsubscribeChunk = window.api.aiOnStreamChunk(sessionId, (chunk) => {
           onChunkRef.current(chunk)
         })
@@ -80,12 +81,7 @@ export function useAIStream(
 
         cleanupRef.current = [unsubscribeChunk, unsubscribeComplete, unsubscribeError]
 
-        const result = await window.api.aiStreamCompletion(
-          modelId,
-          messages,
-          options,
-          sessionId
-        )
+        const result = await window.api.aiStreamCompletion(modelId, messages, options, sessionId)
 
         if (!result.success) {
           setError(result.error || 'Stream failed')
@@ -99,7 +95,7 @@ export function useAIStream(
         setIsStreaming(false)
       }
     },
-    [] // 不再依赖 onChunk/onComplete，通过 ref 读取
+    []
   )
 
   // 组件卸载时清理
@@ -223,9 +219,15 @@ export function useAITasks(): {
   updateTask: (id: string, params: UpdateAITaskParams) => Promise<AITask | null>
   deleteTask: (id: string) => Promise<boolean>
   getTaskSources: (taskId: string) => Promise<AITaskSource[]>
-  replaceTaskSources: (taskId: string, sources: CreateAITaskSourceParams[]) => Promise<AITaskSource[]>
+  replaceTaskSources: (
+    taskId: string,
+    sources: CreateAITaskSourceParams[]
+  ) => Promise<AITaskSource[]>
   getTaskOutputs: (taskId: string) => Promise<AITaskOutput[]>
-  replaceTaskOutputs: (taskId: string, outputs: CreateAITaskOutputParams[]) => Promise<AITaskOutput[]>
+  replaceTaskOutputs: (
+    taskId: string,
+    outputs: CreateAITaskOutputParams[]
+  ) => Promise<AITaskOutput[]>
   acceptTaskOutput: (
     taskId: string,
     outputId: string,

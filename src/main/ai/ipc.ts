@@ -71,16 +71,10 @@ export function registerAIIPC(): void {
       sessionId: string
     ) => {
       try {
-        await aiService.streamCompletion(
-          sessionId,
-          modelId,
-          messages,
-          options,
-          (chunk: string) => {
-            // 发送流式数据到渲染进程
-            _event.sender.send(`ai:stream:chunk:${sessionId}`, chunk)
-          }
-        )
+        await aiService.streamCompletion(sessionId, modelId, messages, options, (chunk: string) => {
+          // 发送流式数据到渲染进程
+          _event.sender.send(`ai:stream:chunk:${sessionId}`, chunk)
+        })
         // 发送完成信号
         _event.sender.send(`ai:stream:complete:${sessionId}`)
         return { success: true }

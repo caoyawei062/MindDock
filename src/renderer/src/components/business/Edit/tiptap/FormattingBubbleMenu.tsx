@@ -13,9 +13,15 @@ import {
   Loader2,
   Quote,
   Sparkles,
-  Strikethrough,
+  Strikethrough
 } from 'lucide-react'
-import { AI_ACTIONS, QUICK_ACTIONS, type AIAction, buildAIPrompt, parseAIResultToContent } from './ai'
+import {
+  AI_ACTIONS,
+  QUICK_ACTIONS,
+  type AIAction,
+  buildAIPrompt,
+  parseAIResultToContent
+} from './ai'
 
 interface FormattingBubbleMenuProps {
   editor: Editor
@@ -34,9 +40,7 @@ interface FormatButton {
   run: () => void
 }
 
-export function FormattingBubbleMenu({
-  editor
-}: FormattingBubbleMenuProps): React.JSX.Element {
+export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps): React.JSX.Element {
   const [showDropdown, setShowDropdown] = useState(false)
   const [aiResult, setAiResult] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
@@ -244,7 +248,9 @@ export function FormattingBubbleMenu({
       const estimatedPanelHeight = 360
       const spaceBelow = window.innerHeight - rect.bottom
       const spaceAbove = rect.top
-      setPanelPlacement(spaceBelow < estimatedPanelHeight && spaceAbove > spaceBelow ? 'top' : 'bottom')
+      setPanelPlacement(
+        spaceBelow < estimatedPanelHeight && spaceAbove > spaceBelow ? 'top' : 'bottom'
+      )
     }
 
     updatePlacement()
@@ -266,7 +272,11 @@ export function FormattingBubbleMenu({
       updateDelay={500}
       pluginKey="format-bubble-menu"
       shouldShow={({ from, to }) =>
-        from !== to || showDropdown || aiLoading || Boolean(aiResult) || Boolean(previewState?.active)
+        from !== to ||
+        showDropdown ||
+        aiLoading ||
+        Boolean(aiResult) ||
+        Boolean(previewState?.active)
       }
     >
       <div ref={wrapperRef} className="relative">

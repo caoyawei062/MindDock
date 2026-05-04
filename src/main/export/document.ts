@@ -21,7 +21,9 @@ function stripTagsPreserveText(input: string): string {
 }
 
 function normalizeParagraphText(input: string): string {
-  return stripTagsPreserveText(input).replace(/\n{3,}/g, '\n\n').trim()
+  return stripTagsPreserveText(input)
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function convertListBlock(input: string, ordered: boolean): string {
@@ -44,11 +46,26 @@ export function normalizeHtmlToMarkdown(html: string): string {
   let markdown = html
     .replace(/\r\n/g, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<(strong|b)[^>]*>([\s\S]*?)<\/\1>/gi, (_m, _tag, text) => `**${normalizeParagraphText(text)}**`)
-    .replace(/<(em|i)[^>]*>([\s\S]*?)<\/\1>/gi, (_m, _tag, text) => `*${normalizeParagraphText(text)}*`)
-    .replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, text) => `[${normalizeParagraphText(text)}](${href})`)
-    .replace(/<img [^>]*src="([^"]+)"[^>]*alt="([^"]*)"[^>]*\/?>/gi, (_m, src, alt) => `![${decodeHtmlEntities(alt)}](${src})`)
-    .replace(/<img [^>]*alt="([^"]*)"[^>]*src="([^"]+)"[^>]*\/?>/gi, (_m, alt, src) => `![${decodeHtmlEntities(alt)}](${src})`)
+    .replace(
+      /<(strong|b)[^>]*>([\s\S]*?)<\/\1>/gi,
+      (_m, _tag, text) => `**${normalizeParagraphText(text)}**`
+    )
+    .replace(
+      /<(em|i)[^>]*>([\s\S]*?)<\/\1>/gi,
+      (_m, _tag, text) => `*${normalizeParagraphText(text)}*`
+    )
+    .replace(
+      /<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi,
+      (_m, href, text) => `[${normalizeParagraphText(text)}](${href})`
+    )
+    .replace(
+      /<img [^>]*src="([^"]+)"[^>]*alt="([^"]*)"[^>]*\/?>/gi,
+      (_m, src, alt) => `![${decodeHtmlEntities(alt)}](${src})`
+    )
+    .replace(
+      /<img [^>]*alt="([^"]*)"[^>]*src="([^"]+)"[^>]*\/?>/gi,
+      (_m, alt, src) => `![${decodeHtmlEntities(alt)}](${src})`
+    )
     .replace(/<img [^>]*src="([^"]+)"[^>]*\/?>/gi, (_m, src) => `![](${src})`)
     .replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_m, text) =>
       normalizeHtmlToMarkdown(text)
@@ -60,16 +77,30 @@ export function normalizeHtmlToMarkdown(html: string): string {
     .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_m, text) => `# ${normalizeParagraphText(text)}\n\n`)
     .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_m, text) => `## ${normalizeParagraphText(text)}\n\n`)
     .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_m, text) => `### ${normalizeParagraphText(text)}\n\n`)
-    .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, (_m, text) => `#### ${normalizeParagraphText(text)}\n\n`)
-    .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, (_m, text) => `##### ${normalizeParagraphText(text)}\n\n`)
-    .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, (_m, text) => `###### ${normalizeParagraphText(text)}\n\n`)
-    .replace(/<pre[^>]*data-language="([^"]+)"[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, (_m, lang, code) =>
-      `\`\`\`${lang}\n${decodeHtmlEntities(code).trim()}\n\`\`\`\n\n`
+    .replace(
+      /<h4[^>]*>([\s\S]*?)<\/h4>/gi,
+      (_m, text) => `#### ${normalizeParagraphText(text)}\n\n`
     )
-    .replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, (_m, code) =>
-      `\`\`\`\n${decodeHtmlEntities(code).trim()}\n\`\`\`\n\n`
+    .replace(
+      /<h5[^>]*>([\s\S]*?)<\/h5>/gi,
+      (_m, text) => `##### ${normalizeParagraphText(text)}\n\n`
     )
-    .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, (_m, code) => `\`${decodeHtmlEntities(code).trim()}\``)
+    .replace(
+      /<h6[^>]*>([\s\S]*?)<\/h6>/gi,
+      (_m, text) => `###### ${normalizeParagraphText(text)}\n\n`
+    )
+    .replace(
+      /<pre[^>]*data-language="([^"]+)"[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+      (_m, lang, code) => `\`\`\`${lang}\n${decodeHtmlEntities(code).trim()}\n\`\`\`\n\n`
+    )
+    .replace(
+      /<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+      (_m, code) => `\`\`\`\n${decodeHtmlEntities(code).trim()}\n\`\`\`\n\n`
+    )
+    .replace(
+      /<code[^>]*>([\s\S]*?)<\/code>/gi,
+      (_m, code) => `\`${decodeHtmlEntities(code).trim()}\``
+    )
     .replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_m, list) => `${convertListBlock(list, false)}\n\n`)
     .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_m, list) => `${convertListBlock(list, true)}\n\n`)
     .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_m, text) => `${normalizeParagraphText(text)}\n\n`)

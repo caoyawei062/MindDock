@@ -302,8 +302,7 @@ export function acceptAITaskOutput(
       throw new Error('Target note not found')
     }
 
-    const separator =
-      note.type === 'document' ? '<hr /><p>AI 任务结果</p>' : '\n\n// AI 任务结果\n'
+    const separator = note.type === 'document' ? '<hr /><p>AI 任务结果</p>' : '\n\n// AI 任务结果\n'
     const appendedContent =
       note.type === 'document'
         ? `${note.content}${separator}${plainTextToHtml(output.content)}`

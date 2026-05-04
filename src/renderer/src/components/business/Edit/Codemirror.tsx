@@ -121,7 +121,9 @@ function Editor({
         },
         '.cm-gutters': {
           backgroundColor: isDark ? '#111315' : '#f3f4f6',
-          borderRight: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(17,24,39,0.06)',
+          borderRight: isDark
+            ? '1px solid rgba(255,255,255,0.06)'
+            : '1px solid rgba(17,24,39,0.06)',
           color: isDark ? 'rgba(229,231,235,0.45)' : 'rgba(17,24,39,0.4)'
         },
         '.cm-activeLine': {

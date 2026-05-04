@@ -28,7 +28,7 @@ const TrayWindow: React.FC = () => {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false)
 
   // 加载代码片段
-  const loadSnippets = useCallback(async () => {
+  const loadSnippets = useCallback(async (): Promise<void> => {
     try {
       const result = await window.api.snippetsGetForTray()
       setSnippets(result)
@@ -53,22 +53,20 @@ const TrayWindow: React.FC = () => {
     if (!searchQuery.trim()) return snippets
     const query = searchQuery.toLowerCase()
     return snippets.filter(
-      (s) =>
-        s.title.toLowerCase().includes(query) ||
-        s.language.toLowerCase().includes(query)
+      (s) => s.title.toLowerCase().includes(query) || s.language.toLowerCase().includes(query)
     )
   }, [snippets, searchQuery])
 
-  const handleItemClick = (snippet: CodeSnippet) => {
+  const handleItemClick = (snippet: CodeSnippet): void => {
     setSelectedId(snippet.id)
     window.api.copySnippet(snippet.code, snippet.title)
   }
 
-  const handleOpenMain = () => {
+  const handleOpenMain = (): void => {
     window.api.openMainWindow()
   }
 
-  const handleSaveSnippet = async () => {
+  const handleSaveSnippet = async (): Promise<void> => {
     if (!newTitle.trim() || !newCode.trim() || isLoading) return
 
     setIsLoading(true)
@@ -99,7 +97,7 @@ const TrayWindow: React.FC = () => {
   const selectedLanguage = DEFAULT_LANGUAGES.find((l) => l.id === newLanguage)
 
   // 渲染浏览标签页
-  const renderBrowseTab = () => (
+  const renderBrowseTab = (): React.JSX.Element => (
     <>
       {/* 搜索框 */}
       <div className="px-3 py-2 flex-shrink-0">
@@ -124,22 +122,28 @@ const TrayWindow: React.FC = () => {
               <div
                 key={snippet.id}
                 onClick={() => handleItemClick(snippet)}
-                className={`group px-3 py-2 rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${selectedId === snippet.id
-                  ? 'bg-blue-500 text-white'
-                  : 'hover:bg-accent'
-                  }`}
+                className={`group px-3 py-2 rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
+                  selectedId === snippet.id ? 'bg-blue-500 text-white' : 'hover:bg-accent'
+                }`}
               >
-                <div className="font-medium text-sm truncate">
-                  {snippet.title}
-                </div>
+                <div className="font-medium text-sm truncate">{snippet.title}</div>
                 <div className="flex items-center justify-between mt-1">
                   <div className="flex items-center gap-1.5">
-                    <Folder size={12} className={selectedId === snippet.id ? 'text-white/80' : 'text-muted-foreground'} />
-                    <span className={`text-xs ${selectedId === snippet.id ? 'text-white/80' : 'text-muted-foreground'}`}>
+                    <Folder
+                      size={12}
+                      className={
+                        selectedId === snippet.id ? 'text-white/80' : 'text-muted-foreground'
+                      }
+                    />
+                    <span
+                      className={`text-xs ${selectedId === snippet.id ? 'text-white/80' : 'text-muted-foreground'}`}
+                    >
                       {snippet.language}
                     </span>
                   </div>
-                  <span className={`text-xs ${selectedId === snippet.id ? 'text-white/80' : 'text-muted-foreground'}`}>
+                  <span
+                    className={`text-xs ${selectedId === snippet.id ? 'text-white/80' : 'text-muted-foreground'}`}
+                  >
                     {snippet.updatedAt}
                   </span>
                 </div>
@@ -148,9 +152,7 @@ const TrayWindow: React.FC = () => {
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Folder size={32} className="mb-2 opacity-50" />
-              <span className="text-sm">
-                {searchQuery ? '未找到匹配项' : '暂无代码片段'}
-              </span>
+              <span className="text-sm">{searchQuery ? '未找到匹配项' : '暂无代码片段'}</span>
             </div>
           )}
         </div>
@@ -159,7 +161,7 @@ const TrayWindow: React.FC = () => {
   )
 
   // 渲染创建标签页
-  const renderCreateTab = () => (
+  const renderCreateTab = (): React.JSX.Element => (
     <div className="flex-1 flex flex-col min-h-0 px-3 py-2 gap-2">
       {/* 标题输入 */}
       <input
@@ -189,8 +191,9 @@ const TrayWindow: React.FC = () => {
                   setNewLanguage(lang.id)
                   setShowLanguageDropdown(false)
                 }}
-                className={`w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors ${newLanguage === lang.id ? 'bg-accent text-foreground' : 'text-muted-foreground'
-                  }`}
+                className={`w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors ${
+                  newLanguage === lang.id ? 'bg-accent text-foreground' : 'text-muted-foreground'
+                }`}
               >
                 {lang.name}
               </button>
@@ -228,20 +231,22 @@ const TrayWindow: React.FC = () => {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setActiveTab('browse')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'browse'
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-              }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+              activeTab === 'browse'
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             <FileText size={14} />
             浏览
           </button>
           <button
             onClick={() => setActiveTab('create')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'create'
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-              }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+              activeTab === 'create'
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             <Plus size={14} />
             创建
@@ -260,9 +265,7 @@ const TrayWindow: React.FC = () => {
 
       {/* 底部操作栏 */}
       <div className="flex items-center px-3 py-2 border-t border-border flex-shrink-0">
-        <button
-          className="flex items-center gap-1 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-        >
+        <button className="flex items-center gap-1 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
           <Settings size={14} />
           <ChevronDown size={12} />
         </button>
@@ -272,4 +275,3 @@ const TrayWindow: React.FC = () => {
 }
 
 export default TrayWindow
-

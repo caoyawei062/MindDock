@@ -23,7 +23,7 @@ const CodeMirrorSettings: React.FC<CodeMirrorSettingsProps> = ({
   onConfigChange,
   className
 }) => {
-  const updateConfig = (key: keyof CodeMirrorConfig) => {
+  const updateConfig = (key: keyof CodeMirrorConfig): void => {
     onConfigChange?.({
       ...config,
       [key]: !config[key]

@@ -24,10 +24,7 @@ function sanitizeHtml(input: string): string {
 /**
  * 将 HTML 内容转换为 PDF
  */
-export async function exportToPDF(
-  htmlContent: string,
-  title: string
-): Promise<Buffer> {
+export async function exportToPDF(htmlContent: string, title: string): Promise<Buffer> {
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
 
   try {
@@ -77,9 +74,7 @@ export async function exportToPDF(
 /**
  * 将 HTML 内容转换为图片 (PNG)
  */
-export async function exportToImage(
-  htmlContent: string
-): Promise<Buffer> {
+export async function exportToImage(htmlContent: string): Promise<Buffer> {
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
 
   try {

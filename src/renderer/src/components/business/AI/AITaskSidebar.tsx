@@ -460,9 +460,7 @@ export function AITaskSidebar({
         </div>
 
         {tasks.length === 0 ? (
-          <p className="py-3 text-center text-xs text-muted-foreground/60">
-            暂无任务
-          </p>
+          <p className="py-3 text-center text-xs text-muted-foreground/60">暂无任务</p>
         ) : (
           <div className="max-h-32 space-y-0.5 overflow-y-auto">
             {tasks.map((task) => (
@@ -565,10 +563,7 @@ export function AITaskSidebar({
                 {sourcesExpanded && (
                   <div className="mt-1.5 space-y-1.5">
                     {sources.map((source) => (
-                      <div
-                        key={source.id}
-                        className="rounded-md bg-muted/30 px-2.5 py-2"
-                      >
+                      <div key={source.id} className="rounded-md bg-muted/30 px-2.5 py-2">
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate text-xs font-medium">
                             {source.label || source.source_type}
@@ -620,8 +615,7 @@ export function AITaskSidebar({
                         )}
                       </div>
 
-                      {output.output_type === 'findings' ||
-                      output.output_type === 'next_steps' ? (
+                      {output.output_type === 'findings' || output.output_type === 'next_steps' ? (
                         <ul className="space-y-1">
                           {renderLineList(output.content).map((line, i) => (
                             <li
@@ -681,7 +675,7 @@ export function AITaskSidebar({
 
               {outputs.length === 0 && selectedTask.status !== 'running' && (
                 <p className="py-2 text-center text-xs text-muted-foreground/50">
-                  点击"运行分析"生成结果
+                  点击“运行分析”生成结果
                 </p>
               )}
             </div>

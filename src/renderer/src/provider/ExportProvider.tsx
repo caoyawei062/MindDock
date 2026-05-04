@@ -51,80 +51,95 @@ export const ExportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [loadExports])
 
   // 导出笔记到 PDF
-  const exportToPDF = useCallback(async (noteId: string): Promise<ExportRecord | null> => {
-    try {
-      const result = await window.api.exportPDF(noteId)
-      if (result) {
-        // 刷新导出列表
-        await loadExports()
-        return result
+  const exportToPDF = useCallback(
+    async (noteId: string): Promise<ExportRecord | null> => {
+      try {
+        const result = await window.api.exportPDF(noteId)
+        if (result) {
+          // 刷新导出列表
+          await loadExports()
+          return result
+        }
+        return null
+      } catch (error) {
+        console.error('Failed to export note:', error)
+        return null
       }
-      return null
-    } catch (error) {
-      console.error('Failed to export note:', error)
-      return null
-    }
-  }, [loadExports])
+    },
+    [loadExports]
+  )
 
   // 导出笔记到图片
-  const exportToImage = useCallback(async (noteId: string): Promise<ExportRecord | null> => {
-    try {
-      const result = await window.api.exportImage(noteId)
-      if (result) {
-        // 刷新导出列表
-        await loadExports()
-        return result
+  const exportToImage = useCallback(
+    async (noteId: string): Promise<ExportRecord | null> => {
+      try {
+        const result = await window.api.exportImage(noteId)
+        if (result) {
+          // 刷新导出列表
+          await loadExports()
+          return result
+        }
+        return null
+      } catch (error) {
+        console.error('Failed to export note:', error)
+        return null
       }
-      return null
-    } catch (error) {
-      console.error('Failed to export note:', error)
-      return null
-    }
-  }, [loadExports])
+    },
+    [loadExports]
+  )
 
   // 导出笔记到 Markdown (主要用于代码片段)
-  const exportToMarkdown = useCallback(async (noteId: string): Promise<ExportRecord | null> => {
-    try {
-      const result = await window.api.exportMarkdown(noteId)
-      if (result) {
-        // 刷新导出列表
-        await loadExports()
-        return result
+  const exportToMarkdown = useCallback(
+    async (noteId: string): Promise<ExportRecord | null> => {
+      try {
+        const result = await window.api.exportMarkdown(noteId)
+        if (result) {
+          // 刷新导出列表
+          await loadExports()
+          return result
+        }
+        return null
+      } catch (error) {
+        console.error('Failed to export note:', error)
+        return null
       }
-      return null
-    } catch (error) {
-      console.error('Failed to export note:', error)
-      return null
-    }
-  }, [loadExports])
+    },
+    [loadExports]
+  )
 
-  const exportToDocx = useCallback(async (noteId: string): Promise<ExportRecord | null> => {
-    try {
-      const result = await window.api.exportDocx(noteId)
-      if (result) {
-        await loadExports()
-        return result
+  const exportToDocx = useCallback(
+    async (noteId: string): Promise<ExportRecord | null> => {
+      try {
+        const result = await window.api.exportDocx(noteId)
+        if (result) {
+          await loadExports()
+          return result
+        }
+        return null
+      } catch (error) {
+        console.error('Failed to export note to Word:', error)
+        return null
       }
-      return null
-    } catch (error) {
-      console.error('Failed to export note to Word:', error)
-      return null
-    }
-  }, [loadExports])
+    },
+    [loadExports]
+  )
 
-  const exportToCode = useCallback(async (noteId: string): Promise<ExportRecord | null> => {
-    try {
-      const result = await window.api.exportCode(noteId)
-      if (result) {
-        await loadExports()
-        return result
+  const exportToCode = useCallback(
+    async (noteId: string): Promise<ExportRecord | null> => {
+      try {
+        const result = await window.api.exportCode(noteId)
+        if (result) {
+          await loadExports()
+          return result
+        }
+        return null
+      } catch (error) {
+        console.error('Failed to export code snippet:', error)
+        return null
       }
-      return null
-    } catch (error) {
-      console.error('Failed to export code snippet:', error)
-      return null
-    }
-  }, [loadExports])
+    },
+    [loadExports]
+  )
 
   // 删除导出记录
   const deleteExport = useCallback(async (id: string): Promise<boolean> => {
@@ -157,7 +172,8 @@ export const ExportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   return <ExportContext.Provider value={value}>{children}</ExportContext.Provider>
 }
 
-export const useExport = () => {
+// eslint-disable-next-line react-refresh/only-export-components
+export const useExport = (): ExportContextType => {
   const context = useContext(ExportContext)
   if (!context) {
     throw new Error('useExport must be used within ExportProvider')
