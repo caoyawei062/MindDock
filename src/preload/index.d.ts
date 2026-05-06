@@ -5,16 +5,7 @@ import {
   AICompletionResult,
   AIMessage,
   AIModelConfig,
-  AIProvider,
-  AITask,
-  AITaskOutput,
-  AITaskOutputAcceptResult,
-  AITaskOutputAcceptTarget,
-  AITaskSource,
-  CreateAITaskOutputParams,
-  CreateAITaskParams,
-  CreateAITaskSourceParams,
-  UpdateAITaskParams
+  AIProvider
 } from '../shared/types/ai'
 
 interface CodeSnippet {
@@ -24,7 +15,6 @@ interface CodeSnippet {
   language: string
 }
 
-// 笔记类型
 interface Note {
   id: string
   title: string
@@ -40,10 +30,9 @@ interface Note {
   created_at: string
   updated_at: string
   trashed_at: string | null
-  tags?: Tag[] // 可选的标签数组
+  tags?: Tag[]
 }
 
-// 标签类型
 interface Tag {
   id: string
   name: string
@@ -51,7 +40,6 @@ interface Tag {
   created_at: string
 }
 
-// 托盘代码片段
 interface TraySnippet {
   id: string
   title: string
@@ -60,21 +48,6 @@ interface TraySnippet {
   updatedAt: string
 }
 
-// 文件夹类型
-interface Folder {
-  id: string
-  name: string
-  parent_id: string | null
-  icon: string | null
-  color: string | null
-  sort_order: number
-  is_expanded: number
-  created_at: string
-  updated_at: string
-  children?: Folder[]
-}
-
-// 导出记录类型
 interface ExportRecord {
   id: string
   note_id: string
@@ -101,7 +74,6 @@ export interface API {
   changeTheme: (theme: THEME) => void
   updateTraySnippets: (snippets: CodeSnippet[]) => void
   onSnippetCopied: (callback: (title: string) => void) => () => void
-  // 托盘窗口专用
   onTraySnippets: (callback: (snippets: CodeSnippet[]) => void) => () => void
   copySnippet: (code: string, title: string) => void
   closeTrayWindow: () => void
@@ -111,7 +83,6 @@ export interface API {
   onThemeChanged: (callback: (theme: string) => void) => () => void
   onAppCommand: (callback: (command: AppCommand) => void) => () => void
 
-  // 数据库 API
   notesGetAll: (type?: 'document' | 'snippet', folderId?: string) => Promise<Note[]>
   notesGetAllWithTags: (
     type?: 'document' | 'snippet',
@@ -143,35 +114,9 @@ export interface API {
   notesSearch: (query: string, type?: 'document' | 'snippet') => Promise<Note[]>
   notesTogglePin: (id: string) => Promise<Note | null>
   snippetsGetForTray: () => Promise<TraySnippet[]>
+  settingsGet: (key: string) => Promise<string | null>
+  settingsSet: (key: string, value: string) => Promise<string>
 
-  // 文件夹 API (暂时禁用)
-  /*
-  foldersGetAll: () => Promise<Folder[]>
-  foldersGetTree: () => Promise<Folder[]>
-  foldersGetById: (id: string) => Promise<Folder | null>
-  foldersCreate: (params: {
-    name: string
-    parent_id?: string | null
-    icon?: string | null
-    color?: string | null
-    sort_order?: number
-  }) => Promise<Folder>
-  foldersUpdate: (
-    id: string,
-    params: {
-      name?: string
-      parent_id?: string | null
-      icon?: string | null
-      color?: string | null
-      sort_order?: number
-      is_expanded?: number
-    }
-  ) => Promise<Folder | null>
-  foldersDelete: (id: string) => Promise<boolean>
-  foldersToggleExpanded: (id: string) => Promise<Folder | null>
-  */
-
-  // 导出 API
   exportsGetAll: (limit?: number) => Promise<ExportRecord[]>
   exportPDF: (noteId: string) => Promise<ExportRecord | null>
   exportImage: (noteId: string) => Promise<ExportRecord | null>
@@ -181,7 +126,6 @@ export interface API {
   exportsDelete: (id: string) => Promise<boolean>
   openPath: (path: string) => Promise<void>
 
-  // 标签 API
   tagsGetAll: () => Promise<Tag[]>
   tagsGetById: (id: string) => Promise<Tag | null>
   tagsCreate: (params: { name: string; color?: string }) => Promise<Tag>
@@ -193,30 +137,6 @@ export interface API {
   tagsSetNoteTags: (noteId: string, tagIds: string[]) => Promise<void>
   tagsGetNoteIds: (tagId: string) => Promise<string[]>
 
-  // AI 任务 API
-  aiTasksGetAll: (sourceId?: string) => Promise<AITask[]>
-  aiTasksGetById: (id: string) => Promise<AITask | null>
-  aiTasksCreate: (params: CreateAITaskParams) => Promise<AITask>
-  aiTasksUpdate: (id: string, params: UpdateAITaskParams) => Promise<AITask | null>
-  aiTasksDelete: (id: string) => Promise<boolean>
-  aiTaskSourcesGet: (taskId: string) => Promise<AITaskSource[]>
-  aiTaskSourcesReplace: (
-    taskId: string,
-    sources: CreateAITaskSourceParams[]
-  ) => Promise<AITaskSource[]>
-  aiTaskOutputsGet: (taskId: string) => Promise<AITaskOutput[]>
-  aiTaskOutputsReplace: (
-    taskId: string,
-    outputs: CreateAITaskOutputParams[]
-  ) => Promise<AITaskOutput[]>
-  aiTaskOutputAccept: (
-    taskId: string,
-    outputId: string,
-    target: AITaskOutputAcceptTarget,
-    noteId?: string
-  ) => Promise<AITaskOutputAcceptResult>
-
-  // AI API
   aiGetAllModels: () => Promise<AIModelConfig[]>
   aiGetEnabledModels: () => Promise<AIModelConfig[]>
   aiGetModelById: (id: string) => Promise<AIModelConfig | undefined>

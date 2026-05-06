@@ -20,8 +20,28 @@ import { registerAIIPC } from './ai/ipc'
 
 let mainWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
+let isQuitting = false
 
 type AppCommand = 'save-current-note' | 'new-document' | 'focus-search'
+
+interface WindowsOverlayConfig {
+  color: string
+  symbolColor: string
+  height: number
+}
+
+function getWindowsOverlayConfig(isDark: boolean): WindowsOverlayConfig {
+  return {
+    color: isDark ? '#1e1e1e' : '#f5f5f5',
+    symbolColor: isDark ? '#cccccc' : '#333333',
+    height: 40
+  }
+}
+
+function updateWindowsOverlay(isDark: boolean): void {
+  if (process.platform !== 'win32' || !mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.setTitleBarOverlay(getWindowsOverlayConfig(isDark))
+}
 
 function dispatchAppCommand(command: AppCommand): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
@@ -134,18 +154,21 @@ function runTypecheck(): Promise<{ success: boolean; output: string }> {
 }
 
 function createWindow(): void {
-  // Create the browser window.
+  const isWin = process.platform === 'win32'
+  const isDark = nativeTheme.shouldUseDarkColors
+
   mainWindow = new BrowserWindow({
     width: 900,
     height: 740,
     minHeight: 740,
     show: false,
     minWidth: 810,
-    // alwaysOnTop: true,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
+    ...(isWin
+      ? { titleBarOverlay: getWindowsOverlayConfig(isDark) }
+      : {}),
     ...(process.platform === 'linux' ? { icon } : {}),
-    ...(process.platform !== 'darwin' ? { titleBarOverlay: true } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -154,13 +177,21 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
-    // 窗口准备好后更新托盘的主窗口引用
-    if (process.platform === 'darwin' && mainWindow) {
+    if ((process.platform === 'darwin' || process.platform === 'win32') && mainWindow) {
       updateMainWindowRef(mainWindow)
     }
   })
 
-  // 窗口关闭时清除引用
+  // On Windows: hide to tray instead of closing
+  if (isWin) {
+    mainWindow.on('close', (event) => {
+      if (!isQuitting) {
+        event.preventDefault()
+        mainWindow?.hide()
+      }
+    })
+  }
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -170,8 +201,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -196,7 +225,7 @@ function createSettingsWindow(): void {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     title: 'MindDock Settings',
     ...(process.platform === 'linux' ? { icon } : {}),
-    ...(process.platform !== 'darwin' ? { titleBarOverlay: true } : {}),
+    ...(process.platform === 'win32' ? { titleBarOverlay: { height: 40 } } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -223,73 +252,55 @@ function createSettingsWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   if (process.platform === 'darwin') {
     app.dock?.setIcon(nativeImage.createFromPath(icon))
   }
 
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
-  // 初始化数据库
   initDatabase()
   registerDatabaseIPC()
-
-  // 初始化 AI IPC
   registerAIIPC()
   createAppMenu()
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  ipcMain.on('ping', () => {})
   ipcMain.on(CHANGETHEME, (_, theme) => {
-    console.log('Theme changed to:', theme)
     nativeTheme.themeSource = theme
 
-    // 广播主题变化到所有窗口
     BrowserWindow.getAllWindows().forEach((win) => {
       win.webContents.send('theme-changed', theme)
     })
+
+    updateWindowsOverlay(nativeTheme.shouldUseDarkColors)
   })
 
-  // 监听系统主题变化
   nativeTheme.on('updated', () => {
-    // 当主题设置为 'system' 时,系统主题变化会触发此事件
     const currentThemeSource = nativeTheme.themeSource
-    console.log('System theme updated, current theme source:', currentThemeSource)
 
     if (currentThemeSource === 'system') {
-      // 获取当前实际的主题（light 或 dark）
       const actualTheme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
-      console.log('Actual theme based on system:', actualTheme)
 
-      // 广播实际主题变化到所有窗口
       BrowserWindow.getAllWindows().forEach((win) => {
         win.webContents.send('theme-changed', actualTheme)
       })
+
+      updateWindowsOverlay(nativeTheme.shouldUseDarkColors)
     }
   })
 
-  // 打开文件路径
   ipcMain.handle('open-path', async (_, filePath: string) => {
     try {
       await shell.showItemInFolder(filePath)
     } catch (error) {
-      console.error('Failed to open path:', error)
       throw error
     }
   })
 
-  // 打开设置窗口
   ipcMain.on('open-settings-window', () => {
     createSettingsWindow()
   })
@@ -300,14 +311,11 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  // 创建托盘（仅 macOS）
-  if (process.platform === 'darwin' && mainWindow) {
+  if ((process.platform === 'darwin' || process.platform === 'win32') && mainWindow) {
     initTray(mainWindow)
   }
 
   app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (mainWindow === null) {
       createWindow()
     } else if (mainWindow && !mainWindow.isVisible()) {
@@ -317,19 +325,13 @@ app.whenReady().then(() => {
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
 
-// 应用退出时关闭数据库
 app.on('before-quit', () => {
+  isQuitting = true
   closeDatabase()
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

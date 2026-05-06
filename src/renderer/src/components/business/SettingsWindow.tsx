@@ -5,6 +5,7 @@ import { useAIConfig } from '@renderer/hooks/useAI'
 import { AIProvider } from '@renderer/types/ai'
 import { Input } from '@renderer/components/ui/input'
 import { Button } from '@renderer/components/ui/button'
+import { Textarea } from '@renderer/components/ui/textarea'
 import ScrollArea from '@renderer/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { AppLocale } from '@renderer/i18n/messages'
@@ -46,6 +47,8 @@ const PROVIDER_LABELS: Record<AIProvider, string> = {
   deepseek: 'DeepSeek'
 }
 
+const AI_SYSTEM_PROMPT_SETTING_KEY = 'ai.systemPrompt'
+
 function SettingsWindow(): React.JSX.Element {
   const { theme, setTheme } = useTheme()
   const { locale, setLocale, t } = useI18n()
@@ -66,6 +69,9 @@ function SettingsWindow(): React.JSX.Element {
   const [providerTestResults, setProviderTestResults] = useState<
     Record<string, { success: boolean; error?: string }>
   >({})
+  const [aiRulesDraft, setAiRulesDraft] = useState('')
+  const [savedAiRules, setSavedAiRules] = useState('')
+  const [isSavingRules, setIsSavingRules] = useState(false)
 
   const navItems = useMemo<NavItem[]>(
     () => [
@@ -88,6 +94,16 @@ function SettingsWindow(): React.JSX.Element {
   useEffect(() => {
     loadAllModels()
   }, [loadAllModels])
+
+  useEffect(() => {
+    const loadAIRules = async (): Promise<void> => {
+      const value = (await window.api.settingsGet(AI_SYSTEM_PROMPT_SETTING_KEY)) ?? ''
+      setAiRulesDraft(value)
+      setSavedAiRules(value)
+    }
+
+    void loadAIRules()
+  }, [])
 
   const visibleNavItems = useMemo(() => {
     const query = navSearchQuery.trim().toLowerCase()
@@ -181,6 +197,7 @@ function SettingsWindow(): React.JSX.Element {
   const providerEnabled = (selectedProviderSummary?.enabled || 0) > 0
   const canTestProvider =
     Boolean(apiKeyDraft.trim()) || selectedProviderModels.some((m) => Boolean(m.apiKey))
+  const isRulesDirty = aiRulesDraft.trim() !== savedAiRules.trim()
 
   const settingsStatusText = useMemo(() => {
     if (activeSection === 'providers') {
@@ -188,8 +205,10 @@ function SettingsWindow(): React.JSX.Element {
       if (isDirty) return t('settings.status.providers.dirty')
       return t('settings.status.providers.clean')
     }
+    if (isSavingRules) return t('settings.status.general.saving')
+    if (isRulesDirty) return t('settings.status.general.dirty')
     return t('settings.status.general')
-  }, [activeSection, isDirty, isSaving, t])
+  }, [activeSection, isDirty, isRulesDirty, isSaving, isSavingRules, t])
 
   const handleSaveProviderConfig = async (): Promise<boolean> => {
     if (!selectedProvider || selectedProviderModels.length === 0) return false
@@ -223,6 +242,21 @@ function SettingsWindow(): React.JSX.Element {
     setApiKeyDraft(apiKeys.every((key) => key === apiKeys[0]) ? apiKeys[0] : '')
     setBaseURLDraft(baseURLs.every((url) => url === baseURLs[0]) ? baseURLs[0] : '')
     setIsDirty(false)
+  }
+
+  const handleSaveAIRules = async (): Promise<void> => {
+    setIsSavingRules(true)
+    try {
+      const savedValue = await window.api.settingsSet(AI_SYSTEM_PROMPT_SETTING_KEY, aiRulesDraft)
+      setAiRulesDraft(savedValue)
+      setSavedAiRules(savedValue)
+    } finally {
+      setIsSavingRules(false)
+    }
+  }
+
+  const handleResetAIRules = (): void => {
+    setAiRulesDraft(savedAiRules)
   }
 
   const handleToggleProvider = async (enabled: boolean): Promise<void> => {
@@ -384,6 +418,50 @@ function SettingsWindow(): React.JSX.Element {
                   </button>
                 )
               })}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-card p-6">
+            <div className="mb-5">
+              <h3 className="text-xl font-semibold">{t('settings.general.aiRules.title')}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('settings.general.aiRules.description')}
+              </p>
+            </div>
+            <div className="space-y-3">
+              <Textarea
+                value={aiRulesDraft}
+                onChange={(e) => setAiRulesDraft(e.target.value)}
+                placeholder={t('settings.general.aiRules.placeholder')}
+                className="min-h-[180px] resize-y font-mono text-sm leading-6"
+              />
+              <p className="text-xs text-muted-foreground">
+                {t('settings.general.aiRules.hint')}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleSaveAIRules}
+                  disabled={!isRulesDirty || isSavingRules}
+                >
+                  {isSavingRules ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      {t('settings.general.aiRules.saving')}
+                    </>
+                  ) : (
+                    t('settings.general.aiRules.save')
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!isRulesDirty || isSavingRules}
+                  onClick={handleResetAIRules}
+                >
+                  {t('common.reset')}
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -760,7 +838,8 @@ function SettingsWindow(): React.JSX.Element {
               {activeNav ? <activeNav.icon className="size-5 text-muted-foreground" /> : null}
               <h2 className="text-2xl font-semibold">{activeNav?.label || t('settings.title')}</h2>
             </div>
-            {activeSection === 'providers' && isDirty ? (
+            {(activeSection === 'providers' && isDirty) ||
+            (activeSection === 'general' && isRulesDirty) ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-700">
                 {t('settings.unsaved')}
               </span>
@@ -780,6 +859,22 @@ function SettingsWindow(): React.JSX.Element {
                     <>
                       <Loader2 className="size-4 animate-spin" />
                       {t('settings.providers.saving')}
+                    </>
+                  ) : (
+                    t('common.save')
+                  )}
+                </Button>
+              ) : null}
+              {activeSection === 'general' ? (
+                <Button
+                  size="sm"
+                  onClick={handleSaveAIRules}
+                  disabled={!isRulesDirty || isSavingRules}
+                >
+                  {isSavingRules ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      {t('settings.general.aiRules.saving')}
                     </>
                   ) : (
                     t('common.save')

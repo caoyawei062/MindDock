@@ -9,7 +9,7 @@ import { useNoteEditor } from '@renderer/hooks/useNoteEditor'
 import { cn } from '@/lib/utils'
 import { ChartNoAxesGantt } from 'lucide-react'
 import { DEFAULT_LANGUAGES } from '../components/business/Edit/types'
-import { AITaskSidebar } from '@renderer/components/business/AI'
+import { AISidebar } from '@renderer/components/business/AI'
 
 // 窄屏阈值（像素）
 const NARROW_THRESHOLD = 500
@@ -246,7 +246,7 @@ const EditLayout = (): React.JSX.Element => {
 
             {/* 侧边栏 */}
             <div className="shrink-0 overflow-hidden" style={{ width: `${aiSidebarWidth}px` }}>
-              <AITaskSidebar className="h-full" editorMode={editorMode} />
+              <AISidebar className="h-full" editorMode={editorMode} />
             </div>
           </>
         )}
