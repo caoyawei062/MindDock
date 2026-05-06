@@ -40,22 +40,7 @@ import {
   toggleAIConfig,
   deleteAIConfig
 } from './ai-configs'
-import {
-  acceptAITaskOutput,
-  createAITask,
-  deleteAITask,
-  getAllAITasks,
-  getAITaskById,
-  getAITaskOutputs,
-  getAITaskSources,
-  replaceAITaskOutputs,
-  replaceAITaskSources,
-  updateAITask,
-  type CreateAITaskOutputParams,
-  type CreateAITaskParams,
-  type CreateAITaskSourceParams,
-  type UpdateAITaskParams
-} from './ai-tasks'
+import { getSetting, setSetting } from './settings'
 import { contentToHTML } from '../export/pdf'
 import { createDocxFromHtml, normalizeHtmlToMarkdown } from '../export/document'
 import { AIModelConfig, AIProvider } from '../ai/types'
@@ -172,6 +157,16 @@ export function registerDatabaseIPC(): void {
   // 获取托盘窗口的代码片段
   ipcMain.handle('db:snippets:getForTray', () => {
     return getSnippetsForTray()
+  })
+
+  // ========== 通用设置 ==========
+
+  ipcMain.handle('db:settings:get', (_event, key: string) => {
+    return getSetting(key)
+  })
+
+  ipcMain.handle('db:settings:set', (_event, key: string, value: string) => {
+    return setSetting(key, value)
   })
 
   // ========== 导出操作 ==========
@@ -511,63 +506,6 @@ export function registerDatabaseIPC(): void {
   ipcMain.handle('db:tags:getNoteIds', (_, tagId: string) => {
     return getNoteIdsByTagId(tagId)
   })
-
-  // ========== AI 任务操作 ==========
-
-  ipcMain.handle('db:aiTasks:getAll', (_, sourceId?: string) => {
-    return getAllAITasks(sourceId)
-  })
-
-  ipcMain.handle('db:aiTasks:getById', (_, id: string) => {
-    return getAITaskById(id)
-  })
-
-  ipcMain.handle('db:aiTasks:create', (_, params: CreateAITaskParams) => {
-    return createAITask(params)
-  })
-
-  ipcMain.handle('db:aiTasks:update', (_, id: string, params: UpdateAITaskParams) => {
-    return updateAITask(id, params)
-  })
-
-  ipcMain.handle('db:aiTasks:delete', (_, id: string) => {
-    return deleteAITask(id)
-  })
-
-  ipcMain.handle('db:aiTaskSources:get', (_, taskId: string) => {
-    return getAITaskSources(taskId)
-  })
-
-  ipcMain.handle(
-    'db:aiTaskSources:replace',
-    (_, taskId: string, sources: CreateAITaskSourceParams[]) => {
-      return replaceAITaskSources(taskId, sources)
-    }
-  )
-
-  ipcMain.handle('db:aiTaskOutputs:get', (_, taskId: string) => {
-    return getAITaskOutputs(taskId)
-  })
-
-  ipcMain.handle(
-    'db:aiTaskOutputs:replace',
-    (_, taskId: string, outputs: CreateAITaskOutputParams[]) => {
-      return replaceAITaskOutputs(taskId, outputs)
-    }
-  )
-
-  ipcMain.handle(
-    'db:aiTaskOutputs:accept',
-    (
-      _,
-      taskId: string,
-      outputId: string,
-      target: 'new_note' | 'append_current' | 'new_snippet',
-      noteId?: string
-    ) => {
-      return acceptAITaskOutput(taskId, outputId, target, noteId)
-    }
-  )
 
   // ========== AI 配置操作 ==========
 

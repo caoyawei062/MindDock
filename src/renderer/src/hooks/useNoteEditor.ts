@@ -57,10 +57,10 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // 用于追踪当前笔记，避免保存到错误的笔记
   const currentNoteIdRef = useRef<string | null>(null)
-  // 标记是否正在初始化（避免初始化时触发保存）
   const isInitializingRef = useRef(false)
+  // Content to apply once the Tiptap editor mounts (code→document switch race)
+  const pendingContentRef = useRef<string | null>(null)
 
   // 设置标签（同时更新本地状态和列表）
   const setTags = useCallback(
@@ -107,9 +107,12 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
 
       if (selectedNote.type === 'document') {
         setEditorMode('word')
-        // 同步设置 Tiptap 内容（editor 可能还没就绪，由下方 guard 处理）
         if (editor) {
           editor.commands.setContent(selectedNote.content || '', { emitUpdate: false })
+          pendingContentRef.current = null
+        } else {
+          // Tiptap is not mounted yet (switching from code mode); apply once it mounts
+          pendingContentRef.current = selectedNote.content || ''
         }
       } else {
         setEditorMode('code')
@@ -136,7 +139,13 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
     }
   }, [selectedNote, editor])
 
-  // 监听 Tiptap 内容变化，仅标记脏状态
+  // Apply deferred content when Tiptap editor becomes available (code→document switch)
+  useEffect(() => {
+    if (!editor || pendingContentRef.current === null) return
+    editor.commands.setContent(pendingContentRef.current, { emitUpdate: false })
+    pendingContentRef.current = null
+  }, [editor])
+
   useEffect(() => {
     if (!editor || !selectedNote || selectedNote.type !== 'document') return
 

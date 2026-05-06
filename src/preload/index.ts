@@ -4,14 +4,9 @@ import { CHANGETHEME, THEME } from '../constants/index'
 import type { API } from './index.d'
 import type {
   AICompletionOptions,
-  AITaskOutputAcceptTarget,
   AIMessage,
   AIModelConfig,
-  AIProvider,
-  CreateAITaskOutputParams,
-  CreateAITaskParams,
-  CreateAITaskSourceParams,
-  UpdateAITaskParams
+  AIProvider
 } from '../shared/types/ai'
 
 interface CodeSnippet {
@@ -140,51 +135,12 @@ const api: API = {
   snippetsGetForTray: () => {
     return ipcRenderer.invoke('db:snippets:getForTray')
   },
-
-  // ============ 文件夹 API (暂时禁用) ============
-  /*
-  // 获取所有文件夹
-  foldersGetAll: () => {
-    return ipcRenderer.invoke('db:folders:getAll')
+  settingsGet: (key: string) => {
+    return ipcRenderer.invoke('db:settings:get', key)
   },
-  // 获取文件夹树
-  foldersGetTree: () => {
-    return ipcRenderer.invoke('db:folders:getTree')
+  settingsSet: (key: string, value: string) => {
+    return ipcRenderer.invoke('db:settings:set', key, value)
   },
-  // 根据 ID 获取文件夹
-  foldersGetById: (id: string) => {
-    return ipcRenderer.invoke('db:folders:getById', id)
-  },
-  // 创建文件夹
-  foldersCreate: (params: {
-    name: string
-    parent_id?: string | null
-    icon?: string | null
-    color?: string | null
-    sort_order?: number
-  }) => {
-    return ipcRenderer.invoke('db:folders:create', params)
-  },
-  // 更新文件夹
-  foldersUpdate: (id: string, params: {
-    name?: string
-    parent_id?: string | null
-    icon?: string | null
-    color?: string | null
-    sort_order?: number
-    is_expanded?: number
-  }) => {
-    return ipcRenderer.invoke('db:folders:update', id, params)
-  },
-  // 删除文件夹
-  foldersDelete: (id: string) => {
-    return ipcRenderer.invoke('db:folders:delete', id)
-  },
-  // 切换文件夹展开状态
-  foldersToggleExpanded: (id: string) => {
-    return ipcRenderer.invoke('db:folders:toggleExpanded', id)
-  },
-  */
 
   // ============ 导出 API ============
 
@@ -262,43 +218,6 @@ const api: API = {
   // 获取使用该标签的所有笔记 ID
   tagsGetNoteIds: (tagId: string) => {
     return ipcRenderer.invoke('db:tags:getNoteIds', tagId)
-  },
-
-  // ============ AI 任务 API ============
-  aiTasksGetAll: (sourceId?: string) => {
-    return ipcRenderer.invoke('db:aiTasks:getAll', sourceId)
-  },
-  aiTasksGetById: (id: string) => {
-    return ipcRenderer.invoke('db:aiTasks:getById', id)
-  },
-  aiTasksCreate: (params: CreateAITaskParams) => {
-    return ipcRenderer.invoke('db:aiTasks:create', params)
-  },
-  aiTasksUpdate: (id: string, params: UpdateAITaskParams) => {
-    return ipcRenderer.invoke('db:aiTasks:update', id, params)
-  },
-  aiTasksDelete: (id: string) => {
-    return ipcRenderer.invoke('db:aiTasks:delete', id)
-  },
-  aiTaskSourcesGet: (taskId: string) => {
-    return ipcRenderer.invoke('db:aiTaskSources:get', taskId)
-  },
-  aiTaskSourcesReplace: (taskId: string, sources: CreateAITaskSourceParams[]) => {
-    return ipcRenderer.invoke('db:aiTaskSources:replace', taskId, sources)
-  },
-  aiTaskOutputsGet: (taskId: string) => {
-    return ipcRenderer.invoke('db:aiTaskOutputs:get', taskId)
-  },
-  aiTaskOutputsReplace: (taskId: string, outputs: CreateAITaskOutputParams[]) => {
-    return ipcRenderer.invoke('db:aiTaskOutputs:replace', taskId, outputs)
-  },
-  aiTaskOutputAccept: (
-    taskId: string,
-    outputId: string,
-    target: AITaskOutputAcceptTarget,
-    noteId?: string
-  ) => {
-    return ipcRenderer.invoke('db:aiTaskOutputs:accept', taskId, outputId, target, noteId)
   },
 
   // ============ AI API ============

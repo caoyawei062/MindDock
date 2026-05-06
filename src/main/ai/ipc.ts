@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { aiConfigManager } from './config'
 import { aiService } from './index'
 import { AIMessage, AIModelConfig, AICompletionOptions, AIProvider } from './types'
+import { AI_SYSTEM_PROMPT_SETTING_KEY, getSetting } from '../database/settings'
 
 /**
  * AI 相关的 IPC 通道名称
@@ -21,6 +22,15 @@ export const AI_IPC_CHANNELS = {
   GENERATE_COMPLETION: 'ai:completion:generate',
   TEST_MODEL: 'ai:model:test'
 } as const
+
+function withGlobalSystemPrompt(messages: AIMessage[]): AIMessage[] {
+  const systemPrompt = getSetting(AI_SYSTEM_PROMPT_SETTING_KEY)?.trim()
+  if (!systemPrompt) {
+    return messages
+  }
+
+  return [{ role: 'system', content: systemPrompt }, ...messages]
+}
 
 /**
  * 注册 AI 相关的 IPC 处理器
@@ -71,10 +81,16 @@ export function registerAIIPC(): void {
       sessionId: string
     ) => {
       try {
-        await aiService.streamCompletion(sessionId, modelId, messages, options, (chunk: string) => {
-          // 发送流式数据到渲染进程
-          _event.sender.send(`ai:stream:chunk:${sessionId}`, chunk)
-        })
+        await aiService.streamCompletion(
+          sessionId,
+          modelId,
+          withGlobalSystemPrompt(messages),
+          options,
+          (chunk: string) => {
+            // 发送流式数据到渲染进程
+            _event.sender.send(`ai:stream:chunk:${sessionId}`, chunk)
+          }
+        )
         // 发送完成信号
         _event.sender.send(`ai:stream:complete:${sessionId}`)
         return { success: true }
@@ -100,7 +116,11 @@ export function registerAIIPC(): void {
       options: Partial<AICompletionOptions>
     ) => {
       try {
-        const result = await aiService.generateCompletion(modelId, messages, options)
+        const result = await aiService.generateCompletion(
+          modelId,
+          withGlobalSystemPrompt(messages),
+          options
+        )
         return { success: true, data: result }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'

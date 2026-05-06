@@ -31,7 +31,6 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { useList, FilterType } from '@renderer/provider/ListProvider'
-// import { FolderSection } from './FolderTree' // 暂时隐藏文件夹功能
 import { useExport } from '@renderer/provider/ExportProvider'
 import { formatDistanceToNow } from 'date-fns'
 import { useI18n } from '@renderer/provider/I18nProvider'
@@ -171,13 +170,6 @@ export function AppSidebar(): React.JSX.Element {
             </SidebarGroup>
           )}
 
-          {/* 暂时隐藏文件夹功能
-          <SidebarGroup>
-            <SidebarGroupContent className="px-0">
-              <FolderSection />
-            </SidebarGroupContent>
-          </SidebarGroup>
-          */}
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>

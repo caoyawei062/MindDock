@@ -88,6 +88,8 @@ export const messages: Record<AppLocale, MessageDictionary> = {
     'settings.noMatchingSettings': '未找到匹配设置项',
     'settings.unsaved': '未保存',
     'settings.status.general': '当前设置页聚焦主题、语言与 AI 配置，其他偏好项会在后续逐步补充。',
+    'settings.status.general.dirty': '通用设置有未保存更改',
+    'settings.status.general.saving': '正在保存通用设置...',
     'settings.status.providers.clean': '提供商配置已保存',
     'settings.status.providers.dirty': '提供商配置有未保存更改',
     'settings.status.providers.saving': '正在保存提供商配置...',
@@ -106,6 +108,15 @@ export const messages: Record<AppLocale, MessageDictionary> = {
     'settings.general.language.en-US': 'English',
     'settings.general.language.zh-CNHint': '适合默认中文答辩与本地使用场景',
     'settings.general.language.en-USHint': '适合英文界面展示与国际化演示',
+    'settings.general.aiRules.title': 'AI Rules / System Prompt',
+    'settings.general.aiRules.description':
+      '为所有 AI 对话配置一段全局规则。保存后，每次 AI 请求都会自动把它作为 system prompt 带入。',
+    'settings.general.aiRules.placeholder':
+      '例如：始终先给结论；回答尽量简洁；改代码时优先保持现有风格；不要编造未验证的信息。',
+    'settings.general.aiRules.hint':
+      '留空表示不注入额外规则。该配置是全局的，会影响侧栏对话和其他 AI 功能。',
+    'settings.general.aiRules.save': '保存规则',
+    'settings.general.aiRules.saving': '保存中...',
     'settings.general.scope.title': '当前范围',
     'settings.general.scope.description':
       'MindDock 当前聚焦本地笔记、代码片段和 AI 辅助工作流。设置页暂时只保留已落地的主题、语言与模型配置，避免界面范围先于产品能力扩张。',
@@ -219,6 +230,8 @@ export const messages: Record<AppLocale, MessageDictionary> = {
     'settings.unsaved': 'Unsaved',
     'settings.status.general':
       'This settings view currently focuses on theme, language, and AI configuration. Additional preferences can be added later.',
+    'settings.status.general.dirty': 'General settings have unsaved changes',
+    'settings.status.general.saving': 'Saving general settings...',
     'settings.status.providers.clean': 'Provider configuration is saved',
     'settings.status.providers.dirty': 'Provider configuration has unsaved changes',
     'settings.status.providers.saving': 'Saving provider configuration...',
@@ -238,6 +251,15 @@ export const messages: Record<AppLocale, MessageDictionary> = {
     'settings.general.language.en-US': 'English',
     'settings.general.language.zh-CNHint': 'Best for Chinese-first demos and local usage',
     'settings.general.language.en-USHint': 'Best for English UI demos and i18n showcase',
+    'settings.general.aiRules.title': 'AI Rules / System Prompt',
+    'settings.general.aiRules.description':
+      'Configure a global rule block for every AI interaction. Once saved, it is automatically injected as a system prompt into each AI request.',
+    'settings.general.aiRules.placeholder':
+      'Example: Lead with the conclusion; keep responses concise; preserve the existing code style; do not invent unverified facts.',
+    'settings.general.aiRules.hint':
+      'Leave empty to disable extra rules. This is a global setting and affects sidebar chats and other AI features.',
+    'settings.general.aiRules.save': 'Save rules',
+    'settings.general.aiRules.saving': 'Saving...',
     'settings.general.scope.title': 'Current Scope',
     'settings.general.scope.description':
       'MindDock is currently focused on local notes, code snippets, and AI-assisted workflows. The settings view intentionally keeps only shipped theme, language, and model configuration to avoid outgrowing the actual product scope.',
@@ -351,6 +373,8 @@ export const messages: Record<AppLocale, MessageDictionary> = {
     'settings.unsaved': '未保存',
     'settings.status.general':
       'この設定画面は現在、テーマ、言語、AI 設定に重点を置いています。その他の設定は今後段階的に追加できます。',
+    'settings.status.general.dirty': '一般設定に未保存の変更があります',
+    'settings.status.general.saving': '一般設定を保存中...',
     'settings.status.providers.clean': 'プロバイダー設定は保存されています',
     'settings.status.providers.dirty': 'プロバイダー設定に未保存の変更があります',
     'settings.status.providers.saving': 'プロバイダー設定を保存中...',
@@ -374,6 +398,15 @@ export const messages: Record<AppLocale, MessageDictionary> = {
     'settings.general.language.en-USHint': '英語 UI のデモや国際化の展示に適しています',
     'settings.general.language.ja-JPHint': '日本語インターフェースの表示確認に適しています',
     'settings.general.language.ru-RUHint': 'キリル文字環境での表示確認に適しています',
+    'settings.general.aiRules.title': 'AI Rules / System Prompt',
+    'settings.general.aiRules.description':
+      'すべての AI 対話に共通で適用するルール文を設定します。保存すると、各 AI リクエストに system prompt として自動挿入されます。',
+    'settings.general.aiRules.placeholder':
+      '例: 先に結論を書く。回答は簡潔にする。コード修正時は既存のスタイルを優先する。未検証の情報を作らない。',
+    'settings.general.aiRules.hint':
+      '空欄のままなら追加ルールは注入されません。この設定はグローバルで、サイドバー対話や他の AI 機能にも影響します。',
+    'settings.general.aiRules.save': 'ルールを保存',
+    'settings.general.aiRules.saving': '保存中...',
     'settings.general.scope.title': '現在の範囲',
     'settings.general.scope.description':
       'MindDock は現在、ローカルノート、コードスニペット、AI 支援ワークフローに集中しています。設定画面も、実装済みのテーマ、言語、モデル設定のみに絞っています。',
@@ -489,6 +522,8 @@ export const messages: Record<AppLocale, MessageDictionary> = {
     'settings.unsaved': 'Не сохранено',
     'settings.status.general':
       'Сейчас эта страница настроек сосредоточена на теме, языке и конфигурации AI. Остальные параметры можно добавить позже.',
+    'settings.status.general.dirty': 'В общих настройках есть несохранённые изменения',
+    'settings.status.general.saving': 'Сохранение общих настроек...',
     'settings.status.providers.clean': 'Конфигурация провайдера сохранена',
     'settings.status.providers.dirty': 'Есть несохранённые изменения в конфигурации провайдера',
     'settings.status.providers.saving': 'Сохранение конфигурации провайдера...',
@@ -514,6 +549,15 @@ export const messages: Record<AppLocale, MessageDictionary> = {
     'settings.general.language.en-USHint': 'Подходит для англоязычного UI и демонстрации i18n',
     'settings.general.language.ja-JPHint': 'Подходит для проверки интерфейса на японском языке',
     'settings.general.language.ru-RUHint': 'Подходит для проверки отображения кириллицы',
+    'settings.general.aiRules.title': 'AI Rules / System Prompt',
+    'settings.general.aiRules.description':
+      'Настройте глобальный набор правил для всех AI-запросов. После сохранения он будет автоматически добавляться как system prompt в каждый AI-запрос.',
+    'settings.general.aiRules.placeholder':
+      'Например: сначала вывод; отвечать кратко; при правке кода сохранять текущий стиль; не выдумывать непроверенные факты.',
+    'settings.general.aiRules.hint':
+      'Пустое значение отключает дополнительные правила. Настройка глобальная и влияет на боковой чат и другие AI-функции.',
+    'settings.general.aiRules.save': 'Сохранить правила',
+    'settings.general.aiRules.saving': 'Сохранение...',
     'settings.general.scope.title': 'Текущий охват',
     'settings.general.scope.description':
       'MindDock сейчас сосредоточен на локальных заметках, кодовых сниппетах и AI-рабочих сценариях. Страница настроек намеренно ограничена реально реализованными темой, языком и настройкой моделей.',
