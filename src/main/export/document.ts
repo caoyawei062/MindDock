@@ -47,6 +47,10 @@ export function normalizeHtmlToMarkdown(html: string): string {
     .replace(/\r\n/g, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(
+      /<a\b[^>]*data-note-id="[^"]*"[^>]*data-note-title="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
+      (_m, noteTitle, text) => `@${normalizeParagraphText(noteTitle || text)}`
+    )
+    .replace(
       /<(strong|b)[^>]*>([\s\S]*?)<\/\1>/gi,
       (_m, _tag, text) => `**${normalizeParagraphText(text)}**`
     )

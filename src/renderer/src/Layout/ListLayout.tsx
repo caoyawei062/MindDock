@@ -16,7 +16,7 @@ const ListLayout: React.FC = () => {
         {open ? <ChevronLeft /> : <ChevronRight />}
       </div>
       <div className={`h-full flex flex-col ${open ? 'pt-0' : 'pt-4'} transition-all`}>
-        <div className={`h-27 ${open ? '' : 'drag'}`}>
+        <div className={`shrink-0 ${open ? '' : 'drag'}`}>
           <Search />
         </div>
         {/* 使用 overlayscrollbars 方案（带动画） */}

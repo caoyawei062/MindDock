@@ -18,6 +18,7 @@ import { Extension, RangeSetBuilder, StateField } from '@codemirror/state'
 import { Decoration, DecorationSet, drawSelection, highlightActiveLine } from '@codemirror/view'
 import { bracketMatching } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
+import ScrollArea from '@renderer/components/ui/scroll-area'
 
 interface CodemirrorProps {
   value?: string
@@ -29,26 +30,35 @@ interface CodemirrorProps {
 }
 
 // 语言扩展映射
-const getLanguageExtension = (lang: string): Extension | null => {
-  const langMap: Record<string, () => Extension> = {
-    javascript: () => javascript({ jsx: true }),
-    typescript: () => javascript({ jsx: true, typescript: true }),
-    python: () => python(),
-    java: () => java(),
-    go: () => go(),
-    rust: () => rust(),
-    c: () => cpp(),
-    cpp: () => cpp(),
-    csharp: () => cpp(), // 使用 cpp 作为 C# 的近似
-    html: () => html(),
-    css: () => css(),
-    json: () => json(),
-    markdown: () => markdown(),
-    sql: () => sql()
-  }
+const languageExtensionFactories: Record<string, () => Extension> = {
+  javascript: () => javascript({ jsx: true }),
+  typescript: () => javascript({ jsx: true, typescript: true }),
+  python: () => python(),
+  java: () => java(),
+  go: () => go(),
+  rust: () => rust(),
+  c: () => cpp(),
+  cpp: () => cpp(),
+  csharp: () => cpp(), // 使用 cpp 作为 C# 的近似
+  html: () => html(),
+  css: () => css(),
+  json: () => json(),
+  markdown: () => markdown(),
+  sql: () => sql()
+}
 
-  const factory = langMap[lang]
-  return factory ? factory() : null
+const languageExtensionCache = new Map<string, Extension>()
+
+const getLanguageExtension = (lang: string): Extension | null => {
+  const cached = languageExtensionCache.get(lang)
+  if (cached) return cached
+
+  const factory = languageExtensionFactories[lang]
+  if (!factory) return null
+
+  const extension = factory()
+  languageExtensionCache.set(lang, extension)
+  return extension
 }
 
 const buildPersistentSelectionDecorations = (state: EditorView['state']): DecorationSet => {
@@ -105,13 +115,19 @@ function Editor({
           color: isDark ? '#e5e7eb' : '#111827'
         },
         '.cm-scroller': {
-          backgroundColor: isDark ? '#111315' : '#f7f7f8'
+          backgroundColor: isDark ? '#111315' : '#f7f7f8',
+          overflow: 'visible !important',
+          minHeight: '100%'
+        },
+        '.cm-editor': {
+          minHeight: '100%'
         },
         '.cm-content': {
           backgroundColor: isDark ? '#111315' : '#f7f7f8',
           caretColor: isDark ? '#f9fafb' : '#111827',
           position: 'relative',
-          zIndex: '2'
+          zIndex: '2',
+          minHeight: '100%'
         },
         '.cm-selectionLayer': {
           zIndex: '1'
@@ -189,7 +205,7 @@ function Editor({
     if (onSelectionChange) {
       exts.push(
         EditorView.updateListener.of((update) => {
-          if (!update.selectionSet && !update.docChanged) return
+          if (!update.selectionSet) return
 
           const mainSelection = update.state.selection.main
           if (mainSelection.empty) {
@@ -214,26 +230,26 @@ function Editor({
   ])
 
   return (
-    <div className="h-full w-full">
-      <CodeMirror
-        value={value}
-        onChange={onChange}
-        height="100%"
-        width="100%"
-        extensions={extensions}
-        basicSetup={{
-          lineNumbers: config.lineNumbers,
-          foldGutter: config.foldGutter,
-          autocompletion: config.autocompletion,
-          highlightActiveLine: false, // 我们在 extensions 中手动处理
-          bracketMatching: false // 我们在 extensions 中手动处理
-        }}
-        onCreateEditor={(view: EditorView) => {
-          onEditorReady?.(view)
-        }}
-        className="h-full"
-      />
-    </div>
+    <ScrollArea className="h-full w-full" orientation="both" theme="editor">
+      <div className="min-h-full w-full">
+        <CodeMirror
+          value={value}
+          onChange={onChange}
+          extensions={extensions}
+          basicSetup={{
+            lineNumbers: config.lineNumbers,
+            foldGutter: config.foldGutter,
+            autocompletion: config.autocompletion,
+            highlightActiveLine: false, // 我们在 extensions 中手动处理
+            bracketMatching: false // 我们在 extensions 中手动处理
+          }}
+          onCreateEditor={(view: EditorView) => {
+            onEditorReady?.(view)
+          }}
+          className="min-h-full"
+        />
+      </div>
+    </ScrollArea>
   )
 }
 

@@ -32,7 +32,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useList, FilterType } from '@renderer/provider/ListProvider'
 import { useExport } from '@renderer/provider/ExportProvider'
-import { formatDistanceToNow } from 'date-fns'
 import { useI18n } from '@renderer/provider/I18nProvider'
 
 // 菜单项类型
@@ -40,6 +39,21 @@ interface MenuItem {
   title: string
   filterType: FilterType
   icon: LucideIcon
+}
+
+function formatExportTime(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  const isYesterday = date.toDateString() === yesterday.toDateString()
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return timeStr
+  if (isYesterday) return `昨天 ${timeStr}`
+  return (
+    date.toLocaleDateString([], { month: 'numeric', day: 'numeric' }) + ' ' + timeStr
+  )
 }
 
 export function AppSidebar(): React.JSX.Element {
@@ -53,7 +67,7 @@ export function AppSidebar(): React.JSX.Element {
     setSelectedNote
   } = useList()
   const { exports, deleteExport, ensureLoaded } = useExport()
-  const { dateFnsLocale, t } = useI18n()
+  const { t } = useI18n()
 
   const items: MenuItem[] = [
     {
@@ -248,10 +262,7 @@ export function AppSidebar(): React.JSX.Element {
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <Clock size={10} />
-                                {formatDistanceToNow(new Date(exp.created_at), {
-                                  addSuffix: true,
-                                  locale: dateFnsLocale
-                                })}
+                                {formatExportTime(exp.created_at)}
                               </div>
                             </div>
                           </div>

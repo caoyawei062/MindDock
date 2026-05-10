@@ -212,6 +212,15 @@ export function deleteNote(id: string): boolean {
 }
 
 /**
+ * 清空回收站
+ */
+export function emptyTrash(): boolean {
+  const db = getDatabase()
+  const result = db.prepare('DELETE FROM notes WHERE is_trashed = 1').run()
+  return result.changes > 0
+}
+
+/**
  * 获取回收站中的笔记
  */
 export function getTrashedNotes(): Note[] {
@@ -417,6 +426,7 @@ export default {
   trashNote,
   restoreNote,
   deleteNote,
+  emptyTrash,
   getTrashedNotes,
   getTrashedNotesWithTags,
   searchNotes,

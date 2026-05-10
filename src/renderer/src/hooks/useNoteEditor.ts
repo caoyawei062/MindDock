@@ -59,8 +59,15 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
 
   const currentNoteIdRef = useRef<string | null>(null)
   const isInitializingRef = useRef(false)
+  const isDirtyRef = useRef(false)
   // Content to apply once the Tiptap editor mounts (code→document switch race)
   const pendingContentRef = useRef<string | null>(null)
+
+  const markDirty = useCallback(() => {
+    if (isDirtyRef.current) return
+    isDirtyRef.current = true
+    setIsDirty(true)
+  }, [])
 
   // 设置标签（同时更新本地状态和列表）
   const setTags = useCallback(
@@ -122,6 +129,7 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
 
       loadNoteTags(selectedNote.id)
 
+      isDirtyRef.current = false
       setIsDirty(false)
       setIsSaving(false)
 
@@ -134,6 +142,7 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
       setEditorMode('word')
       setCodeContentInternal('')
       setTagsInternal([])
+      isDirtyRef.current = false
       setIsDirty(false)
       setIsSaving(false)
     }
@@ -153,14 +162,14 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
       if (isInitializingRef.current) return
       if (selectedNote.id !== currentNoteIdRef.current) return
 
-      setIsDirty(true)
+      markDirty()
     }
 
     editor.on('update', handleUpdate)
     return () => {
       editor.off('update', handleUpdate)
     }
-  }, [editor, selectedNote])
+  }, [editor, markDirty, selectedNote])
 
   // 设置标题，仅更新本地状态并标记脏状态
   const setTitle = useCallback((newTitle: string) => {
@@ -169,8 +178,8 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
     if (isInitializingRef.current) return
     if (!currentNoteIdRef.current) return
 
-    setIsDirty(true)
-  }, [])
+    markDirty()
+  }, [markDirty])
 
   // 设置代码语言，仅更新本地状态并标记脏状态
   const setSelectedLanguage = useCallback((lang: string) => {
@@ -179,8 +188,8 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
     if (isInitializingRef.current) return
     if (!currentNoteIdRef.current) return
 
-    setIsDirty(true)
-  }, [])
+    markDirty()
+  }, [markDirty])
 
   // 设置代码内容，仅更新本地状态并标记脏状态
   const setCodeContent = useCallback((content: string) => {
@@ -189,8 +198,8 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
     if (isInitializingRef.current) return
     if (!currentNoteIdRef.current) return
 
-    setIsDirty(true)
-  }, [])
+    markDirty()
+  }, [markDirty])
 
   const saveNote = useCallback(async () => {
     if (!selectedNote || !currentNoteIdRef.current || isSaving) return
@@ -216,6 +225,7 @@ export function useNoteEditor({ editor }: UseNoteEditorOptions): UseNoteEditorRe
       if (params.title && params.title !== title) {
         setTitleInternal(params.title)
       }
+      isDirtyRef.current = false
       setIsDirty(false)
     } finally {
       setIsSaving(false)

@@ -56,22 +56,23 @@ const stripHtml = (html: string): string => {
 
 const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, filterType }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const { deleteNote, restoreNote, updateNote } = useList()
+  const [emptyTrashDialogOpen, setEmptyTrashDialogOpen] = useState(false)
+  const { deleteNote, restoreNote, updateNote, togglePin, emptyTrash } = useList()
   const { localeTag, t } = useI18n()
 
-  // 格式化时间
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString)
     const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const dateDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    const diffDays = (today - dateDay) / (1000 * 60 * 60 * 24)
 
-    if (days === 0) {
+    if (diffDays === 0) {
       return date.toLocaleTimeString(localeTag, { hour: '2-digit', minute: '2-digit' })
-    } else if (days === 1) {
+    } else if (diffDays === 1) {
       return t('listItem.yesterday')
-    } else if (days < 7) {
-      return t('listItem.daysAgo', { count: days })
+    } else if (diffDays < 7) {
+      return t('listItem.daysAgo', { count: diffDays })
     } else {
       return date.toLocaleDateString(localeTag, { month: 'short', day: 'numeric' })
     }
@@ -96,6 +97,18 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
   const handleToggleFavorite = async (event: React.MouseEvent): Promise<void> => {
     event.stopPropagation()
     await updateNote(note.id, { is_favorite: note.is_favorite === 1 ? 0 : 1 })
+  }
+
+  const handleTogglePin = async (event: React.MouseEvent): Promise<void> => {
+    event.stopPropagation()
+    await togglePin(note.id)
+  }
+
+  const handleEmptyTrash = async (): Promise<void> => {
+    const success = await emptyTrash()
+    if (success) {
+      setEmptyTrashDialogOpen(false)
+    }
   }
 
   return (
@@ -128,6 +141,23 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
         </DialogContent>
       </Dialog>
 
+      <Dialog open={emptyTrashDialogOpen} onOpenChange={setEmptyTrashDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('listItem.emptyTrashDialog.title')}</DialogTitle>
+            <DialogDescription>{t('listItem.emptyTrashDialog.description')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmptyTrashDialogOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="destructive" onClick={handleEmptyTrash}>
+              {t('common.emptyTrash')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div
         onClick={handleClick}
         className={`w-full mx-2 my-1 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
@@ -146,7 +176,7 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
           <span className="font-medium text-sm truncate select-text flex-1">
             {note.title || t('listItem.untitled')}
           </span>
-          {filterType !== 'trash' && (
+          {filterType !== 'trash' && note.is_favorite === 1 && (
             <button
               type="button"
               onClick={handleToggleFavorite}
@@ -180,9 +210,23 @@ const ListItem: React.FC<ListItemProps> = memo(({ note, isSelected, onSelect, fi
                     <Trash2 size={14} className="mr-2" />
                     {t('common.deleteForever')}
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setEmptyTrashDialogOpen(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 size={14} className="mr-2" />
+                    {t('common.emptyTrash')}
+                  </DropdownMenuItem>
                 </>
               ) : (
                 <>
+                  <DropdownMenuItem onClick={handleTogglePin}>
+                    <Pin
+                      size={14}
+                      className={`mr-2 ${note.is_pinned === 1 ? 'fill-current text-primary' : ''}`}
+                    />
+                    {note.is_pinned === 1 ? t('common.unpin') : t('common.pin')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleToggleFavorite}>
                     <Star
                       size={14}

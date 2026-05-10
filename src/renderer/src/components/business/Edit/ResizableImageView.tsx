@@ -3,6 +3,8 @@ import { NodeViewWrapper } from '@tiptap/react'
 import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 
 type ImageAlign = 'left' | 'center' | 'right'
+type CornerDirection = 'nw' | 'ne' | 'sw' | 'se'
+type ImageDisplayMode = 'block' | 'inline'
 
 interface ResizableImageViewProps {
   node: {
@@ -13,6 +15,7 @@ interface ResizableImageViewProps {
       width?: number
       height?: number
       align?: ImageAlign
+      displayMode?: ImageDisplayMode
     }
   }
   updateAttributes: (attributes: Record<string, unknown>) => void
@@ -22,6 +25,38 @@ interface ResizableImageViewProps {
 const MIN_SIZE = 50
 const DEFAULT_MAX_IMAGE_WIDTH = 860
 const QUICK_RESIZE_PRESETS = [25, 50, 75, 100]
+const IMAGE_PARAGRAPH_CLASS = 'image-node-paragraph'
+const CORNER_HANDLES: Array<{
+  direction: CornerDirection
+  cursor: string
+  positionClass: string
+  shapeClass: string
+}> = [
+  {
+    direction: 'nw',
+    cursor: 'nwse-resize',
+    positionClass: '-left-1 -top-1',
+    shapeClass: 'rounded-tl-[18px] border-l-[4px] border-t-[4px]'
+  },
+  {
+    direction: 'ne',
+    cursor: 'nesw-resize',
+    positionClass: '-right-1 -top-1',
+    shapeClass: 'rounded-tr-[18px] border-r-[4px] border-t-[4px]'
+  },
+  {
+    direction: 'sw',
+    cursor: 'nesw-resize',
+    positionClass: '-bottom-1 -left-1',
+    shapeClass: 'rounded-bl-[18px] border-b-[4px] border-l-[4px]'
+  },
+  {
+    direction: 'se',
+    cursor: 'nwse-resize',
+    positionClass: '-bottom-1 -right-1',
+    shapeClass: 'rounded-br-[18px] border-b-[4px] border-r-[4px]'
+  }
+]
 
 interface ImageSize {
   width: number
@@ -45,11 +80,11 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
   updateAttributes,
   selected
 }) => {
-  const { src, alt, title, width, height, align = 'left' } = node.attrs
+  const { src, alt, title, width, height, align = 'left', displayMode = 'inline' } = node.attrs
   const [isHovered, setIsHovered] = useState(false)
   const [tempSize, setTempSize] = useState<ImageSize | null>(null)
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 })
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const tempSizeRef = useRef<ImageSize | null>(null)
   const widthInputRef = useRef<HTMLInputElement>(null)
@@ -93,6 +128,28 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
   }, [src])
 
   useEffect(() => {
+    const wrapper = containerRef.current
+    const paragraph = wrapper?.parentElement
+    if (!paragraph || paragraph.tagName !== 'P') {
+      return
+    }
+
+    const onlyImageNodes =
+      Array.from(paragraph.children).every((child) =>
+        child.classList.contains('resizable-image-node')
+      ) && (paragraph.textContent?.trim() ?? '') === ''
+
+    paragraph.classList.toggle(
+      IMAGE_PARAGRAPH_CLASS,
+      displayMode === 'inline' && onlyImageNodes
+    )
+
+    return () => {
+      paragraph.classList.remove(IMAGE_PARAGRAPH_CLASS)
+    }
+  }, [displayMode])
+
+  useEffect(() => {
     if (!naturalSize.width || !naturalSize.height) return
     if (width || height) return
 
@@ -122,7 +179,7 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
   )
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent, direction: 'se' | 'e' | 's') => {
+    (e: React.MouseEvent, direction: CornerDirection) => {
       e.preventDefault()
       e.stopPropagation()
 
@@ -131,22 +188,20 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
       const startWidth = imageRef.current?.offsetWidth || naturalSize.width || 300
       const startHeight = imageRef.current?.offsetHeight || naturalSize.height || 200
       const aspectRatio = startHeight / startWidth || getAspectRatio()
+      const isEast = direction === 'ne' || direction === 'se'
+      const isSouth = direction === 'sw' || direction === 'se'
 
       const handleMouseMove = (moveEvent: MouseEvent): void => {
         const deltaX = moveEvent.clientX - startX
         const deltaY = moveEvent.clientY - startY
 
-        let newWidth = startWidth
-        let newHeight = startHeight
+        const widthFromX = startWidth + (isEast ? deltaX : -deltaX)
+        const widthFromY = startWidth + ((isSouth ? deltaY : -deltaY) / aspectRatio)
+        const preferWidthFromX =
+          Math.abs(widthFromX - startWidth) >= Math.abs(widthFromY - startWidth)
 
-        if (direction === 'se' || direction === 'e') {
-          newWidth = Math.max(MIN_SIZE, startWidth + deltaX)
-          newHeight = Math.round(newWidth * aspectRatio)
-        }
-        if (direction === 'se' || direction === 's') {
-          newHeight = Math.max(MIN_SIZE, startHeight + deltaY)
-          newWidth = Math.round(newHeight / aspectRatio)
-        }
+        const newWidth = Math.max(MIN_SIZE, Math.round(preferWidthFromX ? widthFromX : widthFromY))
+        const newHeight = Math.max(MIN_SIZE, Math.round(newWidth * aspectRatio))
 
         // 使用临时状态，避免频繁更新 DOM
         const nextSize = clampSize({ width: newWidth, height: newHeight }, getEditorMaxWidth())
@@ -223,6 +278,13 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
     [updateAttributes]
   )
 
+  const handleDisplayModeChange = useCallback(
+    (nextDisplayMode: ImageDisplayMode): void => {
+      updateAttributes({ displayMode: nextDisplayMode })
+    },
+    [updateAttributes]
+  )
+
   // 显示手柄的条件：选中或悬停
   const showHandles = selected || isHovered
 
@@ -242,25 +304,41 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
     imageStyle.height = `${currentHeight}px`
   }
 
-  const wrapperStyle: React.CSSProperties = {
-    display: 'block'
-  }
+  const wrapperStyle: React.CSSProperties =
+    displayMode === 'block'
+      ? {
+          display: 'block',
+          marginTop: '16px',
+          marginBottom: '16px'
+        }
+      : {
+          display: 'inline-block',
+          verticalAlign: 'top',
+          marginRight: '12px',
+          marginBottom: '12px'
+        }
 
-  if (align === 'center') {
-    wrapperStyle.marginLeft = 'auto'
-    wrapperStyle.marginRight = 'auto'
-  } else if (align === 'right') {
-    wrapperStyle.marginLeft = 'auto'
-    wrapperStyle.marginRight = '0'
+  if (displayMode === 'block') {
+    if (align === 'center') {
+      wrapperStyle.marginLeft = 'auto'
+      wrapperStyle.marginRight = 'auto'
+    } else if (align === 'right') {
+      wrapperStyle.marginLeft = 'auto'
+      wrapperStyle.marginRight = '0'
+    } else {
+      wrapperStyle.marginLeft = '0'
+      wrapperStyle.marginRight = 'auto'
+    }
   } else {
     wrapperStyle.marginLeft = '0'
-    wrapperStyle.marginRight = 'auto'
+    wrapperStyle.marginTop = '0'
   }
 
   return (
     <NodeViewWrapper
+      as="span"
       ref={containerRef}
-      className="group relative my-4 block w-fit max-w-full leading-none"
+      className="resizable-image-node group relative w-fit max-w-full align-top leading-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -270,9 +348,8 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
       <div
         style={{
           position: 'relative',
-          display: 'block',
-          width: currentWidth ? `${currentWidth}px` : 'auto',
-          height: currentHeight ? `${currentHeight}px` : 'auto'
+          display: 'inline-block',
+          lineHeight: 0
         }}
       >
         <img
@@ -293,127 +370,151 @@ const ResizableImageView: React.FC<ResizableImageViewProps> = ({
         )}
 
         {selected && (
-          <div className="absolute left-3 top-3 z-10 rounded-lg border bg-background/95 px-3 py-2 shadow-sm backdrop-blur">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="absolute left-1/2 bottom-full z-10 mb-3 flex max-w-[min(calc(100vw-2rem),42rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/70 bg-background/92 px-3 py-2 shadow-[0_14px_34px_rgba(15,23,42,0.14),0_3px_10px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-muted/30 px-2 py-1">
+              <div className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                 <span>W</span>
                 <input
                   key={`width-${currentWidth ?? 'auto'}`}
                   ref={widthInputRef}
                   defaultValue={currentWidth ? String(currentWidth) : ''}
                   onBlur={handleApplyDraftSize}
-                  className="h-7 w-16 rounded border bg-background px-2 text-foreground"
+                  className="h-8 w-16 rounded-lg border border-border/70 bg-background px-2 text-sm text-foreground shadow-sm outline-none transition-colors focus:border-primary/40"
                 />
               </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                 <span>H</span>
                 <input
                   key={`height-${currentHeight ?? 'auto'}`}
                   ref={heightInputRef}
                   defaultValue={currentHeight ? String(currentHeight) : ''}
                   onBlur={handleApplyDraftSize}
-                  className="h-7 w-16 rounded border bg-background px-2 text-foreground"
+                  className="h-8 w-16 rounded-lg border border-border/70 bg-background px-2 text-sm text-foreground shadow-sm outline-none transition-colors focus:border-primary/40"
                 />
               </div>
+            </div>
+
+            <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-muted/30 p-1">
               <button
                 type="button"
-                onClick={handleFitToEditor}
-                className="h-7 rounded border px-2 text-xs text-foreground hover:bg-accent"
+                onClick={() => handleDisplayModeChange('inline')}
+                className={`h-8 rounded-lg px-2.5 text-xs font-medium transition-colors ${
+                  displayMode === 'inline'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                }`}
               >
-                适配宽度
+                并排
               </button>
               <button
                 type="button"
-                onClick={() => handlePresetResize(100)}
-                className="h-7 rounded border px-2 text-xs text-foreground hover:bg-accent"
+                onClick={() => handleDisplayModeChange('block')}
+                className={`h-8 rounded-lg px-2.5 text-xs font-medium transition-colors ${
+                  displayMode === 'block'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                }`}
               >
-                原始尺寸
+                独占一行
               </button>
             </div>
-            <div className="mt-2 flex flex-wrap gap-1">
-              <div className="mr-1 flex items-center gap-1 rounded border p-0.5">
-                <button
-                  type="button"
-                  onClick={() => handleAlignChange('left')}
-                  className={`flex h-6 w-6 items-center justify-center rounded ${
-                    align === 'left'
-                      ? 'bg-primary text-primary-foreground'
+
+            <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-muted/30 p-1">
+              <button
+                type="button"
+                onClick={() => handleAlignChange('left')}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                  displayMode === 'block' && align === 'left'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : displayMode === 'inline'
+                      ? 'text-muted-foreground/40'
                       : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                  }`}
-                  aria-label="左对齐"
-                >
-                  <AlignLeft className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAlignChange('center')}
-                  className={`flex h-6 w-6 items-center justify-center rounded ${
-                    align === 'center'
-                      ? 'bg-primary text-primary-foreground'
+                }`}
+                aria-label="左对齐"
+                disabled={displayMode === 'inline'}
+              >
+                <AlignLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAlignChange('center')}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                  displayMode === 'block' && align === 'center'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : displayMode === 'inline'
+                      ? 'text-muted-foreground/40'
                       : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                  }`}
-                  aria-label="居中对齐"
-                >
-                  <AlignCenter className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAlignChange('right')}
-                  className={`flex h-6 w-6 items-center justify-center rounded ${
-                    align === 'right'
-                      ? 'bg-primary text-primary-foreground'
+                }`}
+                aria-label="居中对齐"
+                disabled={displayMode === 'inline'}
+              >
+                <AlignCenter className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAlignChange('right')}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                  displayMode === 'block' && align === 'right'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : displayMode === 'inline'
+                      ? 'text-muted-foreground/40'
                       : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                  }`}
-                  aria-label="右对齐"
-                >
-                  <AlignRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
+                }`}
+                aria-label="右对齐"
+                disabled={displayMode === 'inline'}
+              >
+                <AlignRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-muted/30 p-1">
               {QUICK_RESIZE_PRESETS.map((ratioPercent) => (
                 <button
                   key={ratioPercent}
                   type="button"
                   onClick={() => handlePresetResize(ratioPercent)}
-                  className="h-6 rounded border px-2 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                  className="h-8 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   {ratioPercent}%
                 </button>
               ))}
             </div>
+
+            <button
+              type="button"
+              onClick={handleFitToEditor}
+              className="h-8 rounded-xl border border-border/70 bg-background/90 px-3 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+            >
+              适配宽度
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetResize(100)}
+              className="h-8 rounded-xl border border-border/70 bg-background/90 px-3 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+            >
+              原始尺寸
+            </button>
           </div>
         )}
 
         {/* 调整大小的手柄 */}
         {showHandles && (
           <>
-            {/* 右下角手柄 */}
-            <div
-              className="absolute bottom-0 right-0 flex h-3.5 w-3.5 cursor-se-resize items-center justify-center rounded-full border-2 border-background bg-primary shadow-md transition-transform hover:scale-110 hover:bg-primary/90"
-              style={{
-                transform: 'translate(-30%, -30%)'
-              }}
-              onMouseDown={(e) => handleMouseDown(e, 'se')}
-            >
-              <div className="h-1.5 w-1.5 rounded-full bg-background/90" />
-            </div>
-
-            {/* 右边手柄 */}
-            <div
-              className="absolute top-1/2 right-0 h-3 w-3 cursor-e-resize rounded-full border-2 border-background bg-primary shadow-md transition-transform hover:scale-110 hover:bg-primary/90"
-              style={{
-                transform: 'translate(-35%, -50%)'
-              }}
-              onMouseDown={(e) => handleMouseDown(e, 'e')}
-            />
-
-            {/* 底边手柄 */}
-            <div
-              className="absolute bottom-0 left-1/2 h-3 w-3 cursor-s-resize rounded-full border-2 border-background bg-primary shadow-md transition-transform hover:scale-110 hover:bg-primary/90"
-              style={{
-                transform: 'translate(-50%, -35%)'
-              }}
-              onMouseDown={(e) => handleMouseDown(e, 's')}
-            />
+            {CORNER_HANDLES.map((handle) => (
+              <div
+                key={handle.direction}
+                className={`absolute ${handle.positionClass} z-20 h-5 w-5 transition-transform hover:scale-105`}
+                style={{ cursor: handle.cursor }}
+                onMouseDown={(e) => handleMouseDown(e, handle.direction)}
+              >
+                <div
+                  className={`h-full w-full border-white ${handle.shapeClass}`}
+                  style={{
+                    filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))'
+                  }}
+                />
+              </div>
+            ))}
           </>
         )}
       </div>

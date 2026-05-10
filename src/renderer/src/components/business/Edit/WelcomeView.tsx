@@ -1,18 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import {
-  FileText,
-  CodeXml,
-  Sparkles,
-  Shield,
-  Keyboard,
-  Star,
-  Tags,
-  Trash2,
-  Database
-} from 'lucide-react'
+import { FileText, CodeXml, Sparkles, Star, Tags, Trash2, Database } from 'lucide-react'
 import logoSrc from '@/assets/logo.png'
 import type { Note, Tag } from '@renderer/provider/ListProvider'
 import { useI18n } from '@renderer/provider/I18nProvider'
+import { ActivityHeatmap } from './ActivityHeatmap'
 
 interface WorkspaceStats {
   notes: Note[]
@@ -58,28 +49,7 @@ const WelcomeView: React.FC = () => {
     ]
   }, [formatNumber, t, workspaceStats])
 
-  const features = [
-    {
-      icon: FileText,
-      title: t('welcome.feature.richText.title'),
-      description: t('welcome.feature.richText.description')
-    },
-    {
-      icon: CodeXml,
-      title: t('welcome.feature.snippets.title'),
-      description: t('welcome.feature.snippets.description')
-    },
-    {
-      icon: Keyboard,
-      title: t('welcome.feature.shortcuts.title'),
-      description: t('welcome.feature.shortcuts.description')
-    },
-    {
-      icon: Shield,
-      title: t('welcome.feature.localFirst.title'),
-      description: t('welcome.feature.localFirst.description')
-    }
-  ]
+  const activeNotes = workspaceStats?.notes ?? []
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-8">
@@ -116,24 +86,9 @@ const WelcomeView: React.FC = () => {
         ))}
       </div>
 
-      {/* 特性网格 */}
-      <div className="grid grid-cols-2 gap-4 max-w-lg mb-12">
-        {features.map((feature, index) => (
-          <div
-            key={index}
-            className="group p-4 rounded-xl bg-muted/30 border border-border/50 hover:bg-muted/50 hover:border-border transition-all duration-200"
-          >
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
-                <feature.icon size={18} />
-              </div>
-              <div>
-                <h3 className="font-medium text-sm mb-1">{feature.title}</h3>
-                <p className="text-xs text-muted-foreground">{feature.description}</p>
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* 活动热力图 */}
+      <div className="w-full max-w-3xl mb-10 px-2">
+        <ActivityHeatmap notes={activeNotes} />
       </div>
 
       {/* 快速开始提示 */}
