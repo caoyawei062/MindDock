@@ -105,7 +105,9 @@ const Tiptap: React.FC = () => {
     }
 
     editor.on('transaction', handleTransaction)
-    return () => editor.off('transaction', handleTransaction)
+    return () => {
+      editor.off('transaction', handleTransaction)
+    }
   }, [editor])
 
   const atTriggerActive = atTrigger !== null
