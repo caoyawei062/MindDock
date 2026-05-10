@@ -110,6 +110,7 @@ export interface API {
   notesTrash: (id: string) => Promise<boolean>
   notesRestore: (id: string) => Promise<boolean>
   notesDelete: (id: string) => Promise<boolean>
+  notesEmptyTrash: () => Promise<boolean>
   notesGetTrashed: () => Promise<Note[]>
   notesSearch: (query: string, type?: 'document' | 'snippet') => Promise<Note[]>
   notesTogglePin: (id: string) => Promise<Note | null>

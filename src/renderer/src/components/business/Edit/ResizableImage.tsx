@@ -8,7 +8,7 @@ export const ResizableImage = Node.extend({
   addOptions() {
     return {
       ...this.parent?.(),
-      inline: false,
+      inline: true,
       allowBase64: true,
       HTMLAttributes: {},
       resize: false
@@ -53,12 +53,24 @@ export const ResizableImage = Node.extend({
         renderHTML: () => {
           return {}
         }
+      },
+      displayMode: {
+        default: 'inline',
+        parseHTML: (element) => {
+          const displayMode = element.getAttribute('data-display-mode')
+          return displayMode === 'block' ? 'block' : 'inline'
+        },
+        renderHTML: (attributes) => {
+          return {
+            'data-display-mode': attributes.displayMode
+          }
+        }
       }
     }
   },
 
   renderHTML({ node }) {
-    const { width, height, src, alt, title, align } = node.attrs
+    const { width, height, src, alt, title, align, displayMode } = node.attrs
 
     let style = ''
     if (width) {
@@ -67,13 +79,17 @@ export const ResizableImage = Node.extend({
     if (height) {
       style += `height: ${height}px;`
     }
-    style += 'display: block;'
-    if (align === 'center') {
-      style += 'margin-left: auto;margin-right: auto;'
-    } else if (align === 'right') {
-      style += 'margin-left: auto;margin-right: 0;'
+    if (displayMode === 'block') {
+      style += 'display: block;'
+      if (align === 'center') {
+        style += 'margin-left: auto;margin-right: auto;'
+      } else if (align === 'right') {
+        style += 'margin-left: auto;margin-right: 0;'
+      } else {
+        style += 'margin-left: 0;margin-right: auto;'
+      }
     } else {
-      style += 'margin-left: 0;margin-right: auto;'
+      style += 'display: inline-block;vertical-align: top;margin: 0 12px 12px 0;'
     }
 
     return [
@@ -83,6 +99,7 @@ export const ResizableImage = Node.extend({
         src,
         alt,
         title,
+        'data-display-mode': displayMode,
         style: style || undefined
       }
     ]

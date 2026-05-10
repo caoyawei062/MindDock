@@ -9,7 +9,7 @@ const MainLayout: React.FC = () => {
   return (
     <>
       <AppSidebar />
-      <main className="w-full relative select-none overflow-hidden">
+      <main className="relative min-w-0 flex-1 select-none overflow-hidden">
         <ResizablePanelGroup orientation="horizontal" className="w-full">
           <ResizablePanel defaultSize={30} minSize={'220px'} maxSize={'350px'}>
             <ListLayout />

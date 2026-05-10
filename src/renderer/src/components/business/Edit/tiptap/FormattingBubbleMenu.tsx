@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
+import { NodeSelection } from '@tiptap/pm/state'
 import {
   Bold,
   Code,
@@ -49,6 +50,13 @@ export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps): Rea
   const cleanupRef = useRef<Array<() => void>>([])
   const selectionRef = useRef<{ from: number; to: number } | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
+
+  const isImageSelection = (): boolean => {
+    const { selection } = editor.state
+    return (
+      selection instanceof NodeSelection && selection.node.type.name === 'image'
+    )
+  }
 
   const formatButtons: FormatButton[] = [
     {
@@ -227,6 +235,11 @@ export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps): Rea
 
   useEffect(() => {
     const handleSelectionUpdate = (): void => {
+      if (isImageSelection()) {
+        setShowDropdown(false)
+        return
+      }
+
       if (showDropdown && !previewState?.active && !aiLoading) {
         setShowDropdown(false)
       }
@@ -271,13 +284,17 @@ export function FormattingBubbleMenu({ editor }: FormattingBubbleMenuProps): Rea
       editor={editor}
       updateDelay={500}
       pluginKey="format-bubble-menu"
-      shouldShow={({ from, to }) =>
-        from !== to ||
-        showDropdown ||
-        aiLoading ||
-        Boolean(aiResult) ||
-        Boolean(previewState?.active)
-      }
+      shouldShow={({ from, to }) => {
+        if (isImageSelection()) return false
+
+        return (
+          from !== to ||
+          showDropdown ||
+          aiLoading ||
+          Boolean(aiResult) ||
+          Boolean(previewState?.active)
+        )
+      }}
     >
       <div ref={wrapperRef} className="relative">
         <div className="flex items-center gap-0.5 rounded-lg border border-border bg-popover px-1 py-1 shadow-lg">

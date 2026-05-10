@@ -1,5 +1,8 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import * as fs from 'fs/promises'
+import * as os from 'os'
+import * as path from 'path'
+import { pathToFileURL } from 'url'
 import {
   getAllNotes,
   getAllNotesWithTags,
@@ -9,6 +12,7 @@ import {
   trashNote,
   restoreNote,
   deleteNote,
+  emptyTrash,
   getTrashedNotes,
   getTrashedNotesWithTags,
   searchNotesWithTags,
@@ -87,6 +91,22 @@ function sanitizeFileName(name: string): string {
   return safeName || 'untitled'
 }
 
+async function createTemporaryExportHtml(html: string): Promise<{
+  htmlPath: string
+  cleanup: () => Promise<void>
+}> {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'minddock-export-'))
+  const htmlPath = path.join(tempDir, 'export.html')
+  await fs.writeFile(htmlPath, html, 'utf8')
+
+  return {
+    htmlPath,
+    cleanup: async () => {
+      await fs.rm(tempDir, { recursive: true, force: true })
+    }
+  }
+}
+
 /**
  * 注册数据库相关的 IPC 处理器
  */
@@ -137,6 +157,10 @@ export function registerDatabaseIPC(): void {
   // 永久删除
   ipcMain.handle('db:notes:delete', (_, id: string) => {
     return deleteNote(id)
+  })
+
+  ipcMain.handle('db:notes:emptyTrash', () => {
+    return emptyTrash()
   })
 
   // 获取回收站笔记
@@ -200,8 +224,8 @@ export function registerDatabaseIPC(): void {
       return null
     }
 
-    // 生成 HTML
     const html = contentToHTML(note.title, note.content)
+    const { htmlPath, cleanup } = await createTemporaryExportHtml(html)
 
     // 创建一个隐藏的窗口来生成 PDF
     const win = new BrowserWindow({
@@ -217,10 +241,8 @@ export function registerDatabaseIPC(): void {
     })
 
     try {
-      // 加载 HTML
-      await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      await win.loadURL(pathToFileURL(htmlPath).toString())
 
-      // 生成 PDF
       const pdfData = await win.webContents.printToPDF({
         pageSize: 'A4',
         printBackground: true,
@@ -243,6 +265,7 @@ export function registerDatabaseIPC(): void {
 
       return exportRecord
     } finally {
+      await cleanup()
       win.close()
     }
   })
@@ -271,14 +294,14 @@ export function registerDatabaseIPC(): void {
       return null
     }
 
-    // 生成 HTML
     const html = contentToHTML(note.title, note.content)
+    const { htmlPath, cleanup } = await createTemporaryExportHtml(html)
 
-    // 创建一个窗口来截图
     const win = new BrowserWindow({
       width: 1200,
       height: 800,
       show: false,
+      backgroundColor: '#ffffff',
       webPreferences: {
         sandbox: true,
         nodeIntegration: false,
@@ -288,20 +311,77 @@ export function registerDatabaseIPC(): void {
     })
 
     try {
-      // 加载 HTML
-      await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      await win.loadURL(pathToFileURL(htmlPath).toString())
 
-      // 等待页面渲染完成（loadURL 已等待 did-finish-load，这里再等一帧确保布局完成）
-      await win.webContents.executeJavaScript(
-        'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'
-      )
+      await win.webContents.executeJavaScript(`
+        (async () => {
+          const images = Array.from(document.images)
 
-      // 截图
-      const image = await win.webContents.capturePage()
+          await Promise.all(images.map(async (img) => {
+            if (img.complete && img.naturalWidth > 0) return
 
-      // 保存为 PNG
-      const buffer = image.toPNG()
-      await fs.writeFile(result.filePath, buffer)
+            if (typeof img.decode === 'function') {
+              try {
+                await img.decode()
+                return
+              } catch {}
+            }
+
+            await new Promise((resolve) => {
+              const cleanup = () => {
+                img.removeEventListener('load', onLoad)
+                img.removeEventListener('error', onError)
+              }
+
+              const onLoad = () => {
+                cleanup()
+                resolve()
+              }
+
+              const onError = () => {
+                cleanup()
+                resolve()
+              }
+
+              img.addEventListener('load', onLoad, { once: true })
+              img.addEventListener('error', onError, { once: true })
+            })
+          }))
+
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+          return {
+            width: Math.max(
+              document.documentElement.scrollWidth,
+              document.body.scrollWidth,
+              document.documentElement.clientWidth
+            ),
+            height: Math.max(
+              document.documentElement.scrollHeight,
+              document.body.scrollHeight,
+              document.documentElement.clientHeight
+            )
+          }
+        })()
+      `).then(async (size: { width: number; height: number }) => {
+        const captureWidth = Math.ceil(size.width)
+        const captureHeight = Math.ceil(size.height)
+
+        win.setContentSize(captureWidth, captureHeight)
+
+        await win.webContents.executeJavaScript(
+          'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'
+        )
+
+        const image = await win.webContents.capturePage({
+          x: 0,
+          y: 0,
+          width: captureWidth,
+          height: captureHeight
+        })
+
+        await fs.writeFile(result.filePath!, image.toPNG())
+      })
 
       // 创建导出记录
       const exportRecord = createExportRecord({
@@ -316,6 +396,7 @@ export function registerDatabaseIPC(): void {
 
       return exportRecord
     } finally {
+      await cleanup()
       win.close()
     }
   })

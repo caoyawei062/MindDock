@@ -9,6 +9,26 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;')
 }
 
+function decodeHtmlEntities(input: string): string {
+  return input
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
+function replaceNoteReferenceAnchors(input: string): string {
+  return input.replace(
+    /<a\b[^>]*data-note-id="[^"]*"[^>]*data-note-title="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
+    (_match, noteTitle, textContent) => {
+      const readableText = decodeHtmlEntities(noteTitle || textContent || '').trim() || '未命名文档'
+      return `<span class="note-reference">@${escapeHtml(readableText)}</span>`
+    }
+  )
+}
+
 function sanitizeHtml(input: string): string {
   return input
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
@@ -19,6 +39,51 @@ function sanitizeHtml(input: string): string {
     .replace(/\son\w+='[^']*'/gi, '')
     .replace(/\son\w+=\{[^}]*\}/gi, '')
     .replace(/javascript:/gi, '')
+}
+
+async function waitForImagesToRender(page: Awaited<ReturnType<typeof puppeteer.launch>> extends infer _T
+  ? import('puppeteer').Page
+  : never): Promise<void> {
+  await page.evaluate(async () => {
+    const images = Array.from(document.images)
+
+    await Promise.all(
+      images.map(async (img) => {
+        if (img.complete && img.naturalWidth > 0) {
+          return
+        }
+
+        if (typeof img.decode === 'function') {
+          try {
+            await img.decode()
+            return
+          } catch {
+            // decode 失败时继续走事件等待，让导出失败暴露为最终的缺图结果
+          }
+        }
+
+        await new Promise<void>((resolve) => {
+          const cleanup = (): void => {
+            img.removeEventListener('load', onLoad)
+            img.removeEventListener('error', onError)
+          }
+
+          const onLoad = (): void => {
+            cleanup()
+            resolve()
+          }
+
+          const onError = (): void => {
+            cleanup()
+            resolve()
+          }
+
+          img.addEventListener('load', onLoad, { once: true })
+          img.addEventListener('error', onError, { once: true })
+        })
+      })
+    )
+  })
 }
 
 /**
@@ -39,6 +104,7 @@ export async function exportToPDF(htmlContent: string, title: string): Promise<B
     await page.setContent(htmlContent, {
       waitUntil: 'networkidle0'
     })
+    await waitForImagesToRender(page)
 
     // 生成 PDF
     const pdfBuffer = await page.pdf({
@@ -96,6 +162,7 @@ export async function exportToImage(htmlContent: string): Promise<Buffer> {
     await page.setContent(htmlContent, {
       waitUntil: 'networkidle0'
     })
+    await waitForImagesToRender(page)
 
     // 获取页面实际高度
     const bodyHeight = await page.evaluate(() => {
@@ -151,7 +218,7 @@ export function contentToHTML(title: string, content: string): string {
     // 换行
     .replace(/\n/gim, '<br />')
   const safeTitle = escapeHtml(title)
-  const safeContent = sanitizeHtml(htmlContent)
+  const safeContent = sanitizeHtml(replaceNoteReferenceAnchors(htmlContent))
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -238,6 +305,11 @@ export function contentToHTML(title: string, content: string): string {
 
     a:hover {
       text-decoration: underline;
+    }
+
+    .note-reference {
+      color: #2563eb;
+      font-weight: 500;
     }
 
     img {

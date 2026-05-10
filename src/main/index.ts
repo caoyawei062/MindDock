@@ -8,6 +8,7 @@ import {
   Menu,
   type MenuItemConstructorOptions
 } from 'electron'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { execFile } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -28,6 +29,18 @@ interface WindowsOverlayConfig {
   color: string
   symbolColor: string
   height: number
+}
+
+function getMacDockIconPath(): string | null {
+  if (process.platform !== 'darwin' || app.isPackaged) return null
+
+  const generatedDockIconPath = join(app.getAppPath(), 'resources', 'icon-dock.png')
+  if (existsSync(generatedDockIconPath)) return generatedDockIconPath
+
+  const dockIconPath = join(app.getAppPath(), 'build', 'icon.icns')
+  if (existsSync(dockIconPath)) return dockIconPath
+
+  return null
 }
 
 function getWindowsOverlayConfig(isDark: boolean): WindowsOverlayConfig {
@@ -158,9 +171,9 @@ function createWindow(): void {
   const isDark = nativeTheme.shouldUseDarkColors
 
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 740,
-    minHeight: 740,
+    width: 1000,
+    height: 840,
+    minHeight: 840,
     show: false,
     minWidth: 810,
     autoHideMenuBar: true,
@@ -253,8 +266,9 @@ function createSettingsWindow(): void {
 }
 
 app.whenReady().then(() => {
-  if (process.platform === 'darwin') {
-    app.dock?.setIcon(nativeImage.createFromPath(icon))
+  const macDockIconPath = getMacDockIconPath()
+  if (macDockIconPath) {
+    app.dock?.setIcon(nativeImage.createFromPath(macDockIconPath))
   }
 
   electronApp.setAppUserModelId('com.electron')

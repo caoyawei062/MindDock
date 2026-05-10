@@ -6,6 +6,7 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import TextAlign from '@tiptap/extension-text-align'
 import { common, createLowlight } from 'lowlight'
 import { ResizableImage } from '../ResizableImage'
+import { NoteReference } from './note-reference'
 
 const lowlight = createLowlight(common)
 
@@ -68,8 +69,9 @@ export function createTiptapExtensions(): Extensions {
     TextAlign.configure({
       types: ['heading', 'paragraph']
     }),
+    NoteReference,
     ResizableImage.configure({
-      inline: false,
+      inline: true,
       allowBase64: true,
       HTMLAttributes: {
         class: 'rounded-lg max-w-full'

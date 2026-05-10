@@ -103,8 +103,10 @@ interface ListContextType {
   ) => Promise<Note | null>
   // 更新笔记标签（同步到列表）
   updateNoteTags: (id: string, tags: Tag[]) => void
+  togglePin: (id: string) => Promise<Note | null>
   deleteNote: (id: string) => Promise<boolean>
   restoreNote: (id: string) => Promise<boolean>
+  emptyTrash: () => Promise<boolean>
 }
 
 const ListContext = createContext<ListContextType | null>(null)
@@ -122,6 +124,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [filterType, setFilterType] = useState<FilterType>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
+  const [allNotesCache, setAllNotesCache] = useState<Note[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [selectedNote, setSelectedNoteInternal] = useState<Note | null>(null)
   const selectedNoteRef = useRef<Note | null>(null)
@@ -138,6 +141,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   })
   const unsavedChangesGuardRef = useRef<UnsavedChangesGuard | null>(null)
+  const searchQueryRef = useRef('')
   // 去除 HTML 标签的辅助函数
   const stripHtml = (html: string): string => {
     return html
@@ -146,12 +150,33 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .trim()
   }
 
+  const applyFilter = useCallback((sourceNotes: Note[], nextFilterType: FilterType): Note[] => {
+    switch (nextFilterType) {
+      case 'document':
+        return sourceNotes.filter((note) => note.type === 'document')
+      case 'snippet':
+        return sourceNotes.filter((note) => note.type === 'snippet')
+      case 'favorite':
+        return sourceNotes.filter((note) => note.is_favorite === 1)
+      case 'all':
+        return sourceNotes
+      case 'trash':
+        return sourceNotes
+      default:
+        return sourceNotes
+    }
+  }, [])
+
   // 搜索结果已经在 loadNotes 中完成，列表层直接消费当前 notes
   const filteredNotes = useMemo(() => notes, [notes])
 
   const registerUnsavedChangesGuard = useCallback((guard: UnsavedChangesGuard | null) => {
     unsavedChangesGuardRef.current = guard
   }, [])
+
+  useEffect(() => {
+    searchQueryRef.current = searchQuery
+  }, [searchQuery])
 
   const commitSelectedNote = useCallback(
     (note: Note | null) => {
@@ -233,14 +258,13 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 加载笔记列表（批量加载标签，避免 N+1）
   const loadNotes = useCallback(
-    async (rawQuery?: string) => {
+    async (rawQuery = '', options?: { forceRefresh?: boolean }) => {
       const requestId = ++loadRequestIdRef.current
-      const query = (rawQuery ?? searchQuery).trim()
+      const query = rawQuery.trim()
+      const forceRefresh = options?.forceRefresh === true
       setIsLoading(true)
       try {
         let notesWithTags: Note[]
-        const listType =
-          filterType === 'document' || filterType === 'snippet' ? filterType : undefined
 
         if (query) {
           if (filterType === 'trash') {
@@ -257,6 +281,8 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
               )
             })
           } else {
+            const listType =
+              filterType === 'document' || filterType === 'snippet' ? filterType : undefined
             const searchResults = await window.api.notesSearch(query, listType)
             notesWithTags =
               filterType === 'favorite'
@@ -265,13 +291,14 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } else if (filterType === 'trash') {
           notesWithTags = await window.api.notesGetTrashedWithTags()
-        } else if (filterType === 'favorite') {
-          const allNotes = await window.api.notesGetAllWithTags(undefined, undefined)
-          notesWithTags = allNotes.filter((note) => note.is_favorite === 1)
-        } else if (filterType === 'all') {
-          notesWithTags = await window.api.notesGetAllWithTags(undefined, undefined)
         } else {
-          notesWithTags = await window.api.notesGetAllWithTags(listType, undefined)
+          if (!forceRefresh && allNotesCache) {
+            notesWithTags = applyFilter(allNotesCache, filterType)
+          } else {
+            const allNotes = await window.api.notesGetAllWithTags(undefined, undefined)
+            setAllNotesCache(allNotes)
+            notesWithTags = applyFilter(allNotes, filterType)
+          }
         }
 
         if (requestId === loadRequestIdRef.current) {
@@ -288,11 +315,21 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     },
-    [filterType, searchQuery]
+    [allNotesCache, applyFilter, filterType]
   )
 
-  // 当筛选类型或搜索内容变化时重新加载；搜索走轻量防抖，避免连续触发 FTS
+  // 类型切换立即响应；无搜索时优先走本地缓存过滤
   useEffect(() => {
+    void loadNotes(searchQueryRef.current)
+  }, [filterType, loadNotes])
+
+  // 搜索输入保留轻量防抖，避免连续触发 FTS
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      void loadNotes('')
+      return
+    }
+
     const timer = window.setTimeout(() => {
       void loadNotes(searchQuery)
     }, 250)
@@ -316,7 +353,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         const note = await window.api.notesCreate(noteParams)
         // 重新加载列表
-        await loadNotes(searchQuery)
+        await loadNotes(searchQuery, { forceRefresh: true })
         // 自动选中
         setSelectedNote(note)
         return note
@@ -351,6 +388,9 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const next = prev.map((n) => (n.id === id ? updatedWithTags : n))
             return filterType === 'favorite' ? next.filter((n) => n.is_favorite === 1) : next
           })
+          setAllNotesCache((prev) =>
+            prev ? prev.map((n) => (n.id === id ? updatedWithTags : n)) : prev
+          )
           if (selectedNoteRef.current?.id === id) {
             commitSelectedNote(updatedWithTags)
           }
@@ -375,6 +415,25 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [commitSelectedNote]
   )
 
+  const togglePin = useCallback(
+    async (id: string) => {
+      try {
+        const updated = await window.api.notesTogglePin(id)
+        if (updated && selectedNoteRef.current?.id === id) {
+          const tags = selectedNoteRef.current.tags ?? (await window.api.tagsGetByNoteId(id))
+          commitSelectedNote({ ...updated, tags })
+        }
+
+        await loadNotes(searchQuery, { forceRefresh: true })
+        return updated
+      } catch (error) {
+        console.error('Failed to toggle pin:', error)
+        return null
+      }
+    },
+    [commitSelectedNote, loadNotes, searchQuery]
+  )
+
   // 删除笔记（移到回收站或永久删除）
   const deleteNote = useCallback(
     async (id: string) => {
@@ -387,7 +446,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (success) {
-          await loadNotes(searchQuery)
+          await loadNotes(searchQuery, { forceRefresh: true })
           if (selectedNoteRef.current?.id === id) {
             commitSelectedNote(null)
           }
@@ -407,7 +466,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const success = await window.api.notesRestore(id)
         if (success) {
-          await loadNotes(searchQuery)
+          await loadNotes(searchQuery, { forceRefresh: true })
         }
         return success
       } catch (error) {
@@ -417,6 +476,22 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     [loadNotes, searchQuery]
   )
+
+  const emptyTrash = useCallback(async () => {
+    try {
+      const success = await window.api.notesEmptyTrash()
+      if (success) {
+        await loadNotes(searchQuery, { forceRefresh: true })
+        if (selectedNoteRef.current?.is_trashed === 1) {
+          commitSelectedNote(null)
+        }
+      }
+      return success
+    } catch (error) {
+      console.error('Failed to empty trash:', error)
+      return false
+    }
+  }, [commitSelectedNote, loadNotes, searchQuery])
 
   // setSelectedNote/updateNote/deleteNote 等现在通过 ref 读取 selectedNote，
   // 不再依赖 selectedNote 状态，所以 stableValue 真正稳定了
@@ -437,8 +512,10 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createNote,
       updateNote,
       updateNoteTags,
+      togglePin,
       deleteNote,
-      restoreNote
+      restoreNote,
+      emptyTrash
     }),
     [
       filterType,
@@ -454,8 +531,10 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createNote,
       updateNote,
       updateNoteTags,
+      togglePin,
       deleteNote,
-      restoreNote
+      restoreNote,
+      emptyTrash
     ]
   )
 

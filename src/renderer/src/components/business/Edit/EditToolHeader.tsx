@@ -121,6 +121,8 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editValue, setEditValue] = useState(title)
   const inputRef = useRef<HTMLInputElement>(null)
+  const isTitleComposingRef = useRef(false)
+  const pendingTitleBlurRef = useRef(false)
 
   // 处理 AI 按钮点击
   const handleAIButtonClick = useCallback(() => {
@@ -130,12 +132,19 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
         const selectedText = editor.state.doc.textBetween(from, to)
         setAIContextText(selectedText)
       } else {
-        clearAIContextText()
+        const fullText = editor.state.doc.textContent.trim()
+        if (fullText) {
+          setAIContextText(fullText)
+        } else {
+          clearAIContextText()
+        }
       }
     } else if (mode === 'code') {
       const selectedCode = getCodeSelectionText()
       if (selectedCode.trim()) {
         setAIContextText(selectedCode)
+      } else if (noteContent.trim()) {
+        setAIContextText(noteContent)
       } else {
         clearAIContextText()
       }
@@ -145,6 +154,7 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   }, [
     mode,
     editor,
+    noteContent,
     setAIContextText,
     clearAIContextText,
     getCodeSelectionText,
@@ -240,26 +250,60 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
     setEditValue(title)
   }, [title])
 
+  const commitTitleEdit = useCallback(
+    (rawTitle: string): void => {
+      const newTitle = rawTitle.trim() || '未命名文档'
+      pendingTitleBlurRef.current = false
+      setIsEditing(false)
+      setEditValue(newTitle)
+      onTitleChange(newTitle)
+    },
+    [onTitleChange]
+  )
+
+  const cancelTitleEdit = useCallback((): void => {
+    pendingTitleBlurRef.current = false
+    setIsEditing(false)
+    setEditValue(title)
+  }, [title])
+
   const handleTitleClick = (): void => {
     setEditValue(title)
     setIsEditing(true)
   }
 
   const handleTitleBlur = (): void => {
-    setIsEditing(false)
-    const newTitle = editValue.trim() || '未命名文档'
-    onTitleChange(newTitle)
+    if (isTitleComposingRef.current) {
+      pendingTitleBlurRef.current = true
+      return
+    }
+
+    commitTitleEdit(editValue)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
+    if (isTitleComposingRef.current || e.nativeEvent.isComposing) {
+      return
+    }
+
     if (e.key === 'Enter') {
-      setIsEditing(false)
-      const newTitle = editValue.trim() || '未命名文档'
-      onTitleChange(newTitle)
+      commitTitleEdit(editValue)
     }
     if (e.key === 'Escape') {
-      setIsEditing(false)
-      setEditValue(title)
+      cancelTitleEdit()
+    }
+  }
+
+  const handleTitleCompositionStart = (): void => {
+    isTitleComposingRef.current = true
+  }
+
+  const handleTitleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>): void => {
+    isTitleComposingRef.current = false
+    setEditValue(e.currentTarget.value)
+
+    if (pendingTitleBlurRef.current) {
+      commitTitleEdit(e.currentTarget.value)
     }
   }
 
@@ -537,6 +581,8 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
                 type="text"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
+                onCompositionStart={handleTitleCompositionStart}
+                onCompositionEnd={handleTitleCompositionEnd}
                 onBlur={handleTitleBlur}
                 onKeyDown={handleKeyDown}
                 className="bg-accent/30 text-center text-sm font-medium text-foreground outline-none ring-1 ring-primary/50 rounded px-4 py-1.5 min-w-[200px] max-w-[400px] selection:bg-primary/20"

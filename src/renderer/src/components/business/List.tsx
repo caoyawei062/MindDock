@@ -77,7 +77,7 @@ const List: React.FC = () => {
   }
 
   return (
-    <div className="mr-1" onClick={handleClick}>
+    <div className="mr-1 min-h-full" onClick={handleClick}>
       {filteredNotes.map((note) => (
         <ListItem
           key={note.id}

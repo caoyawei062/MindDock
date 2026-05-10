@@ -119,6 +119,10 @@ const api: API = {
   notesDelete: (id: string) => {
     return ipcRenderer.invoke('db:notes:delete', id)
   },
+  // 清空回收站
+  notesEmptyTrash: () => {
+    return ipcRenderer.invoke('db:notes:emptyTrash')
+  },
   // 获取回收站笔记
   notesGetTrashed: () => {
     return ipcRenderer.invoke('db:notes:getTrashed')

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Editor } from '@tiptap/react'
 import {
+  AtSign,
   Bold,
   Italic,
   Strikethrough,
@@ -27,6 +28,17 @@ import ScrollArea from '@renderer/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import LanguageSelector from './LanguageSelector'
 import { DEFAULT_LANGUAGES } from './types'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog'
+import { Input } from '@renderer/components/ui/input'
+import { Button } from '@renderer/components/ui/button'
+import { useList, type Note } from '@renderer/provider/ListProvider'
 
 interface EditorToolbarProps {
   editor: Editor
@@ -67,9 +79,14 @@ const ToolbarButton = ({
 const ToolbarDivider = (): React.JSX.Element => <div className="w-px h-5 bg-border mx-1 shrink-0" />
 
 const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
+  const { selectedNote } = useList()
   const imageInputRef = useRef<HTMLInputElement>(null)
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null)
   const [codeBlockLanguage, setCodeBlockLanguage] = useState('plaintext')
+  const [referenceDialogOpen, setReferenceDialogOpen] = useState(false)
+  const [referenceQuery, setReferenceQuery] = useState('')
+  const [availableDocuments, setAvailableDocuments] = useState<Note[]>([])
+  const [referenceLoading, setReferenceLoading] = useState(false)
 
   useEffect(() => {
     const updateSelection = (): void => {
@@ -129,12 +146,48 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
     e.target.value = ''
   }
 
+  const handleOpenReferenceDialog = async (): Promise<void> => {
+    setReferenceDialogOpen(true)
+
+    if (referenceLoading) {
+      return
+    }
+
+    setReferenceLoading(true)
+    const documents = await window.api.notesGetAll('document')
+    setAvailableDocuments(documents.filter((note) => note.is_trashed === 0))
+    setReferenceLoading(false)
+  }
+
+  const handleInsertReference = (note: Note): void => {
+    chainWithSelection()
+      .insertNoteReference({
+        noteId: note.id,
+        noteTitle: note.title || '未命名文档'
+      })
+      .run()
+
+    setReferenceDialogOpen(false)
+    setReferenceQuery('')
+  }
+
+  const normalizedReferenceQuery = referenceQuery.trim().toLowerCase()
+  const referenceCandidates = availableDocuments
+    .filter((note) => note.id !== selectedNote?.id)
+    .filter((note) => {
+      if (!normalizedReferenceQuery) return true
+      const title = (note.title || '未命名文档').toLowerCase()
+      return title.includes(normalizedReferenceQuery)
+    })
+    .slice(0, 20)
+
   return (
-    <ScrollArea
-      orientation="horizontal"
-      className="shrink-0 border-b border-border/50 bg-background/80 backdrop-blur-sm"
-    >
-      <div className="flex items-center gap-0.5 px-4 py-1.5">
+    <>
+      <ScrollArea
+        orientation="horizontal"
+        className="shrink-0 border-b border-border/50 bg-background/80 backdrop-blur-sm"
+      >
+        <div className="flex items-center gap-0.5 px-4 py-1.5">
         {/* 撤销/重做 */}
         <ToolbarButton onClick={() => chainWithSelection().undo().run()} tooltip="撤销">
           <Undo2 size={16} />
@@ -287,6 +340,9 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
         <ToolbarButton onClick={() => imageInputRef.current?.click()} tooltip="插入图片">
           <ImageIcon size={16} />
         </ToolbarButton>
+        <ToolbarButton onClick={() => void handleOpenReferenceDialog()} tooltip="引用文章">
+          <AtSign size={16} />
+        </ToolbarButton>
         <input
           ref={imageInputRef}
           type="file"
@@ -304,8 +360,60 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
         >
           <RemoveFormatting size={16} />
         </ToolbarButton>
-      </div>
-    </ScrollArea>
+        </div>
+      </ScrollArea>
+
+      <Dialog open={referenceDialogOpen} onOpenChange={setReferenceDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>引用文章</DialogTitle>
+            <DialogDescription>插入一个可跳转的文章引用，导出时会显示标题文本。</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <Input
+              value={referenceQuery}
+              onChange={(event) => setReferenceQuery(event.target.value)}
+              placeholder="搜索文章标题..."
+              autoFocus
+            />
+
+            <div className="max-h-80 overflow-y-auto rounded-md border">
+              {referenceLoading ? (
+                <div className="px-3 py-6 text-sm text-muted-foreground">正在加载文章...</div>
+              ) : referenceCandidates.length === 0 ? (
+                <div className="px-3 py-6 text-sm text-muted-foreground">没有匹配的文章</div>
+              ) : (
+                <div className="divide-y">
+                  {referenceCandidates.map((note) => (
+                    <button
+                      key={note.id}
+                      type="button"
+                      onClick={() => handleInsertReference(note)}
+                      className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left transition-colors hover:bg-accent"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-foreground">
+                          {note.title || '未命名文档'}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">{note.updated_at}</div>
+                      </div>
+                      <span className="shrink-0 text-xs text-primary">插入</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReferenceDialogOpen(false)}>
+              取消
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

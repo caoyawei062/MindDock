@@ -257,6 +257,18 @@
   -webkit-user-drag: none;
 }
 
+.ProseMirror p.image-node-paragraph {
+  display: inline-block;
+  margin: 0;
+  vertical-align: top;
+}
+
+.ProseMirror .note-reference {
+  color: hsl(var(--primary));
+  cursor: pointer;
+  font-weight: 500;
+}
+
 /* 禁用默认的选中节点边框，使用自定义的调整大小手柄 */
 .ProseMirror-selectednode {
   outline: none !important;
