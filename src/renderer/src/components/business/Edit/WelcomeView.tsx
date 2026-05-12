@@ -87,7 +87,7 @@ const WelcomeView: React.FC = () => {
       </div>
 
       {/* 活动热力图 */}
-      <div className="w-full max-w-3xl mb-10 px-2">
+      <div className="w-full max-w-3xl mb-10">
         <ActivityHeatmap notes={activeNotes} />
       </div>
 

@@ -16,6 +16,24 @@ let tray: Tray | null = null
 let trayWindow: BrowserWindow | null = null
 let mainWindowRef: BrowserWindow | null = null
 
+function focusMainWindow(command?: 'new-snippet'): void {
+  if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+    if (!mainWindowRef.isVisible()) {
+      mainWindowRef.show()
+    }
+    if (mainWindowRef.isMinimized()) {
+      mainWindowRef.restore()
+    }
+    mainWindowRef.focus()
+    if (command) {
+      mainWindowRef.webContents.send('app-command', command)
+    }
+    return
+  }
+
+  app.emit('activate')
+}
+
 function createTrayWindow(): void {
   trayWindow = new BrowserWindow({
     width: 320,
@@ -85,18 +103,38 @@ function showTrayWindow(): void {
 }
 
 function showWindowsContextMenu(): void {
+  const snippetItems = getSnippetsForTray()
+    .slice(0, 6)
+    .map((snippet) => ({
+      label: `${snippet.title || '未命名片段'} (${snippet.language})`,
+      click: () => {
+        clipboard.writeText(snippet.code)
+        focusMainWindow()
+        mainWindowRef?.webContents.send('snippet-copied', snippet.title)
+      }
+    }))
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: '打开 MindDock',
-      click: () => {
-        if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-          mainWindowRef.show()
-          mainWindowRef.focus()
-        } else {
-          app.emit('activate')
-        }
-      }
+      click: () => focusMainWindow()
     },
+    {
+      label: '新建代码片段',
+      click: () => focusMainWindow('new-snippet')
+    },
+    {
+      label: '打开快捷面板',
+      click: () => showTrayWindow()
+    },
+    ...(snippetItems.length > 0
+      ? [
+          {
+            label: '快速复制最近代码片段',
+            submenu: snippetItems
+          }
+        ]
+      : []),
     { type: 'separator' },
     {
       label: '退出',

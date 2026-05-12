@@ -16,7 +16,7 @@ interface CodeSnippet {
   language: string
 }
 
-type AppCommand = 'save-current-note' | 'new-document' | 'focus-search'
+type AppCommand = 'save-current-note' | 'new-document' | 'new-snippet' | 'focus-search'
 
 // Custom APIs for renderer — typed via Window API interface for type safety across IPC boundary
 const api: API = {
