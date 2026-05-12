@@ -38,16 +38,19 @@ const stripHtml = (html: string): string => {
 }
 
 const Search: React.FC = () => {
-  const { createNote, setFilterType, setSelectedNote } = useList()
+  const { createNote, setFilterType, setSelectedNote, searchQuery, setSearchQuery } = useList()
   const { t } = useI18n()
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState('')
+  const [inlineQuery, setInlineQuery] = React.useState(searchQuery)
   const [selectedIndex, setSelectedIndex] = React.useState(0)
   const [notes, setNotes] = React.useState<Note[]>([])
   const [loadingNotes, setLoadingNotes] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
-  const hasLoadedNotesRef = React.useRef(false)
+  const inlineInputRef = React.useRef<HTMLInputElement>(null)
   const entryRefs = React.useRef<Array<HTMLButtonElement | null>>([])
+  const isInlineComposingRef = React.useRef(false)
+  const isPaletteComposingRef = React.useRef(false)
 
   const shortcutLabel = React.useMemo(() => {
     return navigator.platform.toLowerCase().includes('mac') ? '⌘K' : 'Ctrl+K'
@@ -60,13 +63,10 @@ const Search: React.FC = () => {
   }, [])
 
   const loadPaletteNotes = React.useCallback(async () => {
-    if (hasLoadedNotesRef.current) return
-
     setLoadingNotes(true)
     try {
       const allNotes = await window.api.notesGetAllWithTags(undefined, undefined)
       setNotes(allNotes)
-      hasLoadedNotesRef.current = true
     } catch (error) {
       console.error('Failed to load command palette notes:', error)
       setNotes([])
@@ -78,6 +78,10 @@ const Search: React.FC = () => {
   const openPalette = React.useCallback(() => {
     setOpen(true)
   }, [])
+
+  React.useEffect(() => {
+    setInlineQuery(searchQuery)
+  }, [searchQuery])
 
   const handleCreateDocument = React.useCallback(async () => {
     closePalette()
@@ -95,6 +99,44 @@ const Search: React.FC = () => {
     closePalette()
     window.api.openSettingsWindow()
   }, [closePalette])
+
+  const commitInlineSearch = React.useCallback(
+    (nextValue: string) => {
+      setSearchQuery(nextValue)
+    },
+    [setSearchQuery]
+  )
+
+  const handleInlineSearchChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const nextValue = event.target.value
+      setInlineQuery(nextValue)
+      if (!isInlineComposingRef.current) {
+        commitInlineSearch(nextValue)
+      }
+    },
+    [commitInlineSearch]
+  )
+
+  const handleInlineCompositionStart = React.useCallback(() => {
+    isInlineComposingRef.current = true
+  }, [])
+
+  const handleInlineCompositionEnd = React.useCallback(
+    (event: React.CompositionEvent<HTMLInputElement>) => {
+      isInlineComposingRef.current = false
+      const nextValue = event.currentTarget.value
+      setInlineQuery(nextValue)
+      commitInlineSearch(nextValue)
+    },
+    [commitInlineSearch]
+  )
+
+  const clearInlineSearch = React.useCallback(() => {
+    setInlineQuery('')
+    setSearchQuery('')
+    inlineInputRef.current?.focus()
+  }, [setSearchQuery])
 
   const buildFilterAction = React.useCallback(
     (
@@ -180,7 +222,12 @@ const Search: React.FC = () => {
     const filtered = normalizedQuery
       ? notes.filter((note) => {
           if (note.title.toLowerCase().includes(normalizedQuery)) return true
-          if (stripHtml(note.content || '').toLowerCase().includes(normalizedQuery)) return true
+          if (
+            stripHtml(note.content || '')
+              .toLowerCase()
+              .includes(normalizedQuery)
+          )
+            return true
           if (note.language?.toLowerCase().includes(normalizedQuery)) return true
           return note.tags?.some((tag) => tag.name.toLowerCase().includes(normalizedQuery)) ?? false
         })
@@ -265,6 +312,10 @@ const Search: React.FC = () => {
 
   const handleInputKeyDown = React.useCallback(
     async (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (isPaletteComposingRef.current || event.nativeEvent.isComposing) {
+        return
+      }
+
       if (event.key === 'ArrowDown') {
         event.preventDefault()
         setSelectedIndex((prev) => Math.min(prev + 1, combinedEntries.length - 1))
@@ -305,6 +356,14 @@ const Search: React.FC = () => {
     },
     [closePalette, combinedEntries, selectedIndex]
   )
+
+  const handlePaletteCompositionStart = React.useCallback(() => {
+    isPaletteComposingRef.current = true
+  }, [])
+
+  const handlePaletteCompositionEnd = React.useCallback(() => {
+    isPaletteComposingRef.current = false
+  }, [])
 
   const renderEntry = (entry: PaletteEntry, index: number): React.JSX.Element => {
     const isActive = selectedIndex === index
@@ -353,17 +412,39 @@ const Search: React.FC = () => {
   return (
     <>
       <div className="border-b p-3 dark:border-border-dark">
-        <button
-          type="button"
-          onClick={openPalette}
-          className="flex h-9 w-full items-center gap-3 rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent/30"
-        >
-          <SearchIcon className="size-4 shrink-0" />
-          <span className="flex-1 text-left">{t('commandPalette.placeholder')}</span>
-          <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {shortcutLabel}
-          </kbd>
-        </button>
+        <div className="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs">
+          <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+          <Input
+            ref={inlineInputRef}
+            value={inlineQuery}
+            onChange={handleInlineSearchChange}
+            onCompositionStart={handleInlineCompositionStart}
+            onCompositionEnd={handleInlineCompositionEnd}
+            placeholder={t('search.placeholder')}
+            className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+          />
+          {inlineQuery ? (
+            <button
+              type="button"
+              onClick={clearInlineSearch}
+              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              title={t('search.clear')}
+            >
+              <X className="size-4" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={openPalette}
+            className="flex shrink-0 items-center gap-2 rounded-md border border-border bg-muted/50 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground"
+            title={t('commandPalette.placeholder')}
+          >
+            <span>{t('commandPalette.shortLabel')}</span>
+            <kbd className="rounded border border-border bg-background px-1 py-0.5 leading-none">
+              {shortcutLabel}
+            </kbd>
+          </button>
+        </div>
 
         <div className="mt-2 flex justify-around">
           <div className="w-[calc(50%-8px)]">
@@ -391,6 +472,8 @@ const Search: React.FC = () => {
                 ref={inputRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onCompositionStart={handlePaletteCompositionStart}
+                onCompositionEnd={handlePaletteCompositionEnd}
                 onKeyDown={handleInputKeyDown}
                 placeholder={t('commandPalette.placeholder')}
                 className="h-11 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
@@ -424,7 +507,9 @@ const Search: React.FC = () => {
                   {t('commandPalette.section.notes')}
                 </div>
                 {loadingNotes ? (
-                  <div className="px-3 py-6 text-sm text-muted-foreground">{t('common.loading')}</div>
+                  <div className="px-3 py-6 text-sm text-muted-foreground">
+                    {t('common.loading')}
+                  </div>
                 ) : noteEntries.length > 0 ? (
                   <div className="space-y-1">
                     {noteEntries.map((entry, index) =>

@@ -118,6 +118,15 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
     setAiSuggestedTags([])
     setSelectedAiTags(new Set())
     currentResponseRef.current = ''
+    let unsubscribeChunk: (() => void) | undefined
+    let unsubscribeComplete: (() => void) | undefined
+    let unsubscribeError: (() => void) | undefined
+
+    const cleanupListeners = (): void => {
+      unsubscribeChunk?.()
+      unsubscribeComplete?.()
+      unsubscribeError?.()
+    }
 
     try {
       // 使用 AI 生成更多标签供选择
@@ -129,11 +138,11 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
       const modelId = models[0].id
 
       // 设置监听器
-      window.api.aiOnStreamChunk(sessionId, (chunk: string) => {
+      unsubscribeChunk = window.api.aiOnStreamChunk(sessionId, (chunk: string) => {
         currentResponseRef.current += chunk
       })
 
-      window.api.aiOnStreamComplete(sessionId, async (): Promise<void> => {
+      unsubscribeComplete = window.api.aiOnStreamComplete(sessionId, async (): Promise<void> => {
         // 解析返回的标签
         const response = currentResponseRef.current
         const tagNames = response
@@ -172,18 +181,24 @@ const TagInputDropdown: React.FC<TagInputDropdownProps> = ({
 
         setAiSuggestedTags(candidates)
         setIsGenerating(false)
+        cleanupListeners()
       })
 
-      window.api.aiOnStreamError(sessionId, (error: string) => {
+      unsubscribeError = window.api.aiOnStreamError(sessionId, (error: string) => {
         console.error('AI generation error:', error)
         setIsGenerating(false)
+        cleanupListeners()
       })
 
       // 调用流式生成
-      await window.api.aiStreamCompletion(modelId, messages, {}, sessionId)
+      const result = await window.api.aiStreamCompletion(modelId, messages, {}, sessionId)
+      if (!result.success) {
+        throw new Error(result.error || 'AI tag generation failed')
+      }
     } catch (error) {
       console.error('Failed to generate tags:', error)
       setIsGenerating(false)
+      cleanupListeners()
     }
   }
 

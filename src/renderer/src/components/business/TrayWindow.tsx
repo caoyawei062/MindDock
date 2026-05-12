@@ -66,6 +66,10 @@ const TrayWindow: React.FC = () => {
     window.api.openMainWindow()
   }
 
+  const handleOpenSettings = (): void => {
+    window.api.openSettingsWindow()
+  }
+
   const handleSaveSnippet = async (): Promise<void> => {
     if (!newTitle.trim() || !newCode.trim() || isLoading) return
 
@@ -265,9 +269,12 @@ const TrayWindow: React.FC = () => {
 
       {/* 底部操作栏 */}
       <div className="flex items-center px-3 py-2 border-t border-border flex-shrink-0">
-        <button className="flex items-center gap-1 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+        <button
+          onClick={handleOpenSettings}
+          className="flex items-center gap-1.5 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          title="打开设置"
+        >
           <Settings size={14} />
-          <ChevronDown size={12} />
         </button>
       </div>
     </div>

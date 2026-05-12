@@ -232,6 +232,11 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
     }
   }, [noteId, isExporting, exportToCode])
 
+  const handleCopyContent = useCallback(() => {
+    if (!noteContent) return
+    void navigator.clipboard.writeText(noteContent)
+  }, [noteContent])
+
   // 处理删除笔记
   const handleDelete = useCallback(async () => {
     if (!noteId) return
@@ -318,7 +323,10 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
           {
             id: 'copy',
             icon: Copy,
-            tooltip: '复制内容'
+            tooltip: '复制内容',
+            onClick: handleCopyContent,
+            disabled: !noteContent,
+            modes: ['code']
           },
           {
             id: 'outline',
@@ -384,7 +392,9 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
       toggleToolbar,
       aiPanelOpen,
       handleAIButtonClick,
+      handleCopyContent,
       noteId,
+      noteContent,
       isExporting,
       onSave,
       isDirty,

@@ -23,6 +23,7 @@ export interface AICompletionOptions {
   temperature?: number
   maxTokens?: number
   topP?: number
+  toolMode?: 'code-edit'
 }
 
 export interface AICompletionResult {

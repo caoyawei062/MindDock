@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 import type { Note } from '@renderer/provider/ListProvider'
+import ScrollArea from '@/components/ui/scroll-area'
+import { useI18n } from '@renderer/provider/I18nProvider'
 
 interface Props {
   notes: Note[]
@@ -42,12 +44,28 @@ interface TooltipState {
   y: number
 }
 
-const MONTH_NAMES = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
-const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', '']
 const LEGEND_COUNTS = [0, 2, 4, 6, 8]
 
 export const ActivityHeatmap: React.FC<Props> = ({ notes }) => {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+  const { localeTag, formatNumber, t } = useI18n()
+  const monthFormatter = useMemo(
+    () => new Intl.DateTimeFormat(localeTag, { month: 'short' }),
+    [localeTag]
+  )
+  const tooltipDateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(localeTag, { year: 'numeric', month: 'long', day: 'numeric' }),
+    [localeTag]
+  )
+  const dayLabels = useMemo(() => {
+    const baseSunday = new Date(2026, 0, 4)
+    return Array.from({ length: 7 }, (_, index) => {
+      if (index !== 1 && index !== 3 && index !== 5) return ''
+      const date = new Date(baseSunday)
+      date.setDate(baseSunday.getDate() + index)
+      return new Intl.DateTimeFormat(localeTag, { weekday: 'short' }).format(date)
+    })
+  }, [localeTag])
 
   const { columns, monthLabels, activeDays, totalEdits } = useMemo(() => {
     const countMap = new Map<string, number>()
@@ -81,7 +99,7 @@ export const ActivityHeatmap: React.FC<Props> = ({ notes }) => {
     cols.forEach((week, i) => {
       const m = week[0].date.getMonth()
       if (m !== lastMonth) {
-        if (lastMonth !== -1) labels.push({ text: MONTH_NAMES[m], col: i })
+        if (lastMonth !== -1) labels.push({ text: monthFormatter.format(week[0].date), col: i })
         lastMonth = m
       }
     })
@@ -93,21 +111,23 @@ export const ActivityHeatmap: React.FC<Props> = ({ notes }) => {
     const total = [...countMap.values()].reduce((a, b) => a + b, 0)
 
     return { columns: cols, monthLabels: labels, activeDays: active, totalEdits: total }
-  }, [notes])
+  }, [monthFormatter, notes])
 
   const DAY_LABEL_WIDTH = 28
 
   return (
-    <div className="w-full overflow-x-auto">
-      <div className="mx-auto w-fit">
-        <div className="flex items-baseline gap-2 mb-3">
-          <span className="text-sm font-medium">
-            过去一年活跃 <span className="text-primary">{activeDays}</span> 天
-          </span>
-          <span className="text-xs text-muted-foreground">共 {totalEdits} 次编辑</span>
-        </div>
+    <div className="w-full">
+      <div className="mb-3 flex items-baseline justify-center gap-2">
+        <span className="text-sm font-medium">
+          {t('welcome.heatmap.activeDays', { count: formatNumber(activeDays) })}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {t('welcome.heatmap.totalEdits', { count: formatNumber(totalEdits) })}
+        </span>
+      </div>
 
-        <div className="inline-block min-w-max">
+      <ScrollArea className="w-full pb-2" orientation="horizontal">
+        <div className="mx-auto inline-block min-w-max px-1">
           {/* Month labels */}
           <div className="relative h-4 mb-1" style={{ marginLeft: DAY_LABEL_WIDTH }}>
             {monthLabels.map(({ text, col }) => (
@@ -127,7 +147,7 @@ export const ActivityHeatmap: React.FC<Props> = ({ notes }) => {
               className="flex flex-col shrink-0"
               style={{ gap: CELL_GAP, width: DAY_LABEL_WIDTH - CELL_GAP }}
             >
-              {DAY_LABELS.map((label, i) => (
+              {dayLabels.map((label, i) => (
                 <div
                   key={i}
                   style={{ height: CELL_SIZE }}
@@ -169,7 +189,7 @@ export const ActivityHeatmap: React.FC<Props> = ({ notes }) => {
 
           {/* Legend */}
           <div className="flex items-center gap-1 mt-2 justify-end text-[10px] text-muted-foreground">
-            <span>少</span>
+            <span>{t('welcome.heatmap.less')}</span>
             {LEGEND_COUNTS.map((n) => (
               <div
                 key={n}
@@ -177,10 +197,10 @@ export const ActivityHeatmap: React.FC<Props> = ({ notes }) => {
                 className={colorClass(n)}
               />
             ))}
-            <span>多</span>
+            <span>{t('welcome.heatmap.more')}</span>
           </div>
         </div>
-      </div>
+      </ScrollArea>
 
       {/* Hover tooltip via portal */}
       {tooltip &&
@@ -195,14 +215,12 @@ export const ActivityHeatmap: React.FC<Props> = ({ notes }) => {
           >
             <div className="bg-popover border border-border rounded-md px-2.5 py-1.5 shadow-md text-xs">
               <div className="font-medium text-foreground">
-                {tooltip.date.toLocaleDateString('zh-CN', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
+                {tooltipDateFormatter.format(tooltip.date)}
               </div>
               <div className="text-muted-foreground mt-0.5">
-                {tooltip.count === 0 ? '暂无编辑记录' : `${tooltip.count} 次编辑`}
+                {tooltip.count === 0
+                  ? t('welcome.heatmap.noEdits')
+                  : t('welcome.heatmap.editCount', { count: formatNumber(tooltip.count) })}
               </div>
             </div>
             {/* Arrow */}

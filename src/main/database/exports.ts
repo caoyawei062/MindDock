@@ -9,6 +9,29 @@ export interface ExportRecord {
   created_at: string
 }
 
+const SQLITE_UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/
+const ISO_TIMESTAMP_WITH_ZONE_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})$/
+
+export function normalizeExportCreatedAt(createdAt: string): string {
+  if (SQLITE_UTC_TIMESTAMP_PATTERN.test(createdAt)) {
+    return `${createdAt.replace(' ', 'T')}Z`
+  }
+
+  if (!ISO_TIMESTAMP_WITH_ZONE_PATTERN.test(createdAt)) {
+    throw new Error(`Invalid export created_at timestamp: ${createdAt}`)
+  }
+
+  return new Date(createdAt).toISOString()
+}
+
+function normalizeExportRecord(record: ExportRecord): ExportRecord {
+  return {
+    ...record,
+    created_at: normalizeExportCreatedAt(record.created_at)
+  }
+}
+
 /**
  * 创建导出记录表
  */
@@ -21,7 +44,7 @@ export function createExportsTable(): void {
       note_title TEXT NOT NULL,
       file_path TEXT NOT NULL,
       export_type TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL,
       FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
     )
   `)
@@ -43,13 +66,14 @@ export function createExportRecord(params: {
 }): ExportRecord {
   const db = getDatabase()
   const id = `export_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  const createdAt = new Date().toISOString()
 
   const stmt = db.prepare(`
-    INSERT INTO exports (id, note_id, note_title, file_path, export_type)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO exports (id, note_id, note_title, file_path, export_type, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
   `)
 
-  stmt.run(id, params.noteId, params.noteTitle, params.filePath, params.exportType)
+  stmt.run(id, params.noteId, params.noteTitle, params.filePath, params.exportType, createdAt)
 
   return getExportById(id)!
 }
@@ -61,11 +85,11 @@ export function getAllExports(limit: number = 10): ExportRecord[] {
   const db = getDatabase()
   const stmt = db.prepare(`
     SELECT * FROM exports
-    ORDER BY created_at DESC
+    ORDER BY datetime(created_at) DESC
     LIMIT ?
   `)
 
-  return stmt.all(limit) as ExportRecord[]
+  return (stmt.all(limit) as ExportRecord[]).map(normalizeExportRecord)
 }
 
 /**
@@ -75,7 +99,7 @@ export function getExportById(id: string): ExportRecord | null {
   const db = getDatabase()
   const stmt = db.prepare('SELECT * FROM exports WHERE id = ?')
   const result = stmt.get(id) as ExportRecord | undefined
-  return result || null
+  return result ? normalizeExportRecord(result) : null
 }
 
 /**
@@ -86,10 +110,10 @@ export function getExportsByNoteId(noteId: string): ExportRecord[] {
   const stmt = db.prepare(`
     SELECT * FROM exports
     WHERE note_id = ?
-    ORDER BY created_at DESC
+    ORDER BY datetime(created_at) DESC
   `)
 
-  return stmt.all(noteId) as ExportRecord[]
+  return (stmt.all(noteId) as ExportRecord[]).map(normalizeExportRecord)
 }
 
 /**
@@ -112,7 +136,7 @@ export function cleanOldExports(noteId: string, keepCount: number = 5): void {
   const stmt = db.prepare(`
     SELECT id FROM exports
     WHERE note_id = ?
-    ORDER BY created_at DESC
+    ORDER BY datetime(created_at) DESC
     LIMIT ?
   `)
 

@@ -53,6 +53,7 @@ import {
 interface AISidebarProps {
   className?: string
   editorMode?: 'word' | 'code'
+  currentDocumentContent?: string
 }
 
 interface MarkdownCodeProps extends React.HTMLAttributes<HTMLElement> {
@@ -70,7 +71,7 @@ interface AISessionState {
   workspaceSession: CodeWorkspaceSession | null
 }
 
-type AISidebarMode = 'ask' | 'agent'
+type AISidebarMode = 'ask' | 'edit'
 
 const SUPPORTED_AGENT_WRITE_TOOLS = new Set<AgentToolCall['name']>([
   'modify_current_file',
@@ -152,12 +153,25 @@ function getCodeLanguage(className?: string): string {
   return match?.[1] || 'text'
 }
 
+function shouldRenderAsInlineCodeBlock(language: string, content: string): boolean {
+  const normalizedLanguage = language.toLowerCase()
+  const normalizedContent = content.trim()
+  const isPlainText = normalizedLanguage === 'text' || normalizedLanguage === 'plain'
+
+  return (
+    isPlainText &&
+    normalizedContent.length > 0 &&
+    normalizedContent.length <= 80 &&
+    !normalizedContent.includes('\n')
+  )
+}
+
 function createMessageId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 function getModeLabel(mode: AISidebarMode): string {
-  if (mode === 'agent') return 'AGENT'
+  if (mode === 'edit') return 'EDIT'
   return 'ASK'
 }
 
@@ -272,11 +286,20 @@ function StreamMarkdown({
         // eslint-disable-next-line react/prop-types
         const { inline, className, children, ...rest } = props as MarkdownCodeProps
         const codeContent = String(children ?? '').replace(/\n$/, '')
+        const language = getCodeLanguage(className)
 
         if (inline) {
           return (
             <code className="rounded bg-muted px-1.5 py-0.5 text-[0.85em]" {...rest}>
               {children}
+            </code>
+          )
+        }
+
+        if (shouldRenderAsInlineCodeBlock(language, codeContent)) {
+          return (
+            <code className="rounded bg-muted px-1.5 py-0.5 text-[0.85em]" {...rest}>
+              {codeContent}
             </code>
           )
         }
@@ -292,7 +315,6 @@ function StreamMarkdown({
           )
         }
 
-        const language = getCodeLanguage(className)
         const codeId = `${language}:${codeContent.slice(0, 32)}:${codeContent.length}`
         const isCopied = copiedCodeId === codeId
 
@@ -368,7 +390,11 @@ function StreamMarkdown({
   )
 }
 
-export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): React.JSX.Element {
+export function AISidebar({
+  className,
+  editorMode = 'word',
+  currentDocumentContent = ''
+}: AISidebarProps): React.JSX.Element {
   const { selectedNote } = useList()
   const {
     editor,
@@ -379,6 +405,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     clearAIContextText,
     aiPanelOpen,
     getCodeSelectionText,
+    clearCodeSelectionText,
     getCodeEditorView,
     getCodeDocument,
     replaceCodeDocument
@@ -404,6 +431,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const currentResponseRef = useRef('')
   const currentSessionIdRef = useRef<string | null>(null)
+  const currentEditRunIdRef = useRef<string | null>(null)
   const copiedMessageTimerRef = useRef<number | null>(null)
   const sessionsRef = useRef<Record<string, AISessionState>>({})
   const currentNoteKey = selectedNote?.id ?? '__global__'
@@ -425,6 +453,26 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     }
   }, [getCodeSelectionText])
 
+  const getCurrentCodeDocument = (): string => {
+    return currentDocumentContent || getCodeDocument() || selectedNote?.content || ''
+  }
+
+  const resolveCurrentContextText = (): string => {
+    if (editorMode === 'code') {
+      const currentCodeDocument = getCurrentCodeDocument().trim()
+      const selectedCode = getSelectedCodeText().trim()
+      if (selectedCode && currentCodeDocument.includes(selectedCode)) {
+        return selectedCode
+      }
+      return currentCodeDocument
+    }
+
+    const selectedText = getSelectedEditorText()
+    if (selectedText) return selectedText
+
+    return getAIContextText()
+  }
+
   useEffect(() => {
     const externalInput = getAIInputText()
     if (externalInput) {
@@ -436,23 +484,22 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
   useEffect(() => {
     if (!aiPanelOpen) return
 
-    const externalContext = getAIContextText()
-    if (externalContext) {
-      setContextText(externalContext)
-      return
-    }
-
-    const selectedText = editorMode === 'code' ? getSelectedCodeText() : getSelectedEditorText()
-    if (selectedText) {
-      setContextText(selectedText)
-      setAIContextText(selectedText)
+    const nextContextText = resolveCurrentContextText()
+    setContextText(nextContextText)
+    if (nextContextText) {
+      setAIContextText(nextContextText)
+    } else {
+      clearAIContextText()
     }
   }, [
     aiPanelOpen,
+    currentNoteKey,
+    currentDocumentContent,
     editorMode,
-    getAIContextText,
+    getCodeDocument,
     getSelectedCodeText,
     getSelectedEditorText,
+    clearAIContextText,
     setAIContextText
   ])
 
@@ -470,17 +517,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     return () => {
       editor.off('selectionUpdate', handleSelectionUpdate)
     }
-  }, [aiPanelOpen, editor, editorMode, getSelectedEditorText, setAIContextText])
-
-  useEffect(() => {
-    if (editorMode !== 'code' || !aiPanelOpen) return
-
-    const selectedCode = getSelectedCodeText()
-    if (!selectedCode) return
-
-    setContextText(selectedCode)
-    setAIContextText(selectedCode)
-  }, [aiPanelOpen, editorMode, getSelectedCodeText, setAIContextText])
+  }, [aiPanelOpen, currentNoteKey, editor, editorMode, getSelectedEditorText, setAIContextText])
 
   useEffect(() => {
     loadModels()
@@ -509,6 +546,13 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     const previousNoteKey = previousNoteKeyRef.current
     if (previousNoteKey === currentNoteKey) return
 
+    const activeSessionId = currentSessionIdRef.current
+    if (activeSessionId) {
+      void window.api.aiCancelStream(activeSessionId)
+      currentSessionIdRef.current = null
+      currentEditRunIdRef.current = null
+    }
+
     sessionsRef.current[previousNoteKey] = {
       messages,
       input,
@@ -521,7 +565,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     const nextSession = sessionsRef.current[currentNoteKey]
     setMessages(nextSession?.messages ?? [])
     setInput(nextSession?.input ?? '')
-    setContextText(nextSession?.contextText ?? '')
+    setContextText('')
     setWorkspaceSession(nextSession?.workspaceSession ?? null)
     setStreamingResponse('')
     currentResponseRef.current = ''
@@ -530,13 +574,10 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     if (nextSession?.selectedModel) {
       setSelectedModel(nextSession.selectedModel)
     }
-    setInteractionMode(nextSession?.interactionMode === 'agent' ? 'agent' : 'ask')
+    setInteractionMode(nextSession?.interactionMode === 'edit' ? 'edit' : 'ask')
 
-    if (nextSession?.contextText) {
-      setAIContextText(nextSession.contextText)
-    } else {
-      clearAIContextText()
-    }
+    clearAIContextText()
+    clearCodeSelectionText()
 
     previousNoteKeyRef.current = currentNoteKey
   }, [
@@ -547,8 +588,8 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     selectedModel,
     interactionMode,
     workspaceSession,
-    setAIContextText,
-    clearAIContextText
+    clearAIContextText,
+    clearCodeSelectionText
   ])
 
   useEffect(() => {
@@ -581,28 +622,25 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     }
   }
 
-  const getCurrentCodeDocument = (): string => {
-    return getCodeDocument() || selectedNote?.content || ''
-  }
-
   const handleConversationSend = async (
     prompt: string,
-    options?: { baseMessages?: SidebarMessage[] }
+    options?: { baseMessages?: SidebarMessage[]; modeOverride?: AISidebarMode }
   ): Promise<void> => {
     const baseMessages = options?.baseMessages ?? messages
     const currentCodeDocument = editorMode === 'code' ? getCurrentCodeDocument() : ''
+    const currentContextText = resolveCurrentContextText()
     const userMessage: SidebarMessage = {
       id: createMessageId('user'),
       role: 'user',
       content: prompt,
-      mode: editorMode === 'code' ? interactionMode : undefined
+      mode: editorMode === 'code' ? (options?.modeOverride ?? interactionMode) : undefined
     }
 
-    const referenceMessage = contextText
+    const referenceMessage = currentContextText
       ? [
           {
             role: 'system' as const,
-            content: `当前编辑器选中的${editorMode === 'code' ? '代码' : '文本'}引用如下，请优先结合它回答用户问题。\n\n${contextText}`
+            content: `当前编辑器${editorMode === 'code' ? '代码' : '文本'}引用如下，请优先结合它回答用户问题。\n\n${currentContextText}`
           }
         ]
       : []
@@ -614,6 +652,12 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     ]
 
     setMessages([...baseMessages, userMessage])
+    setContextText(currentContextText)
+    if (currentContextText) {
+      setAIContextText(currentContextText)
+    } else {
+      clearAIContextText()
+    }
     setInput('')
     setPendingCommand(null)
     setStreamingResponse('')
@@ -628,6 +672,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
 
     try {
       unsubscribeChunk = window.api.aiOnStreamChunk(sessionId, (chunk: string) => {
+        if (currentSessionIdRef.current !== sessionId) return
         setStreamingResponse((prev) => {
           const next = prev + chunk
           currentResponseRef.current = next
@@ -649,6 +694,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
       })
 
       unsubscribeComplete = window.api.aiOnStreamComplete(sessionId, () => {
+        if (currentSessionIdRef.current !== sessionId) return
         const finalResponse = currentResponseRef.current.trim()
         if (finalResponse) {
           setMessages((prev) => [
@@ -657,7 +703,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
               id: createMessageId('assistant'),
               role: 'assistant',
               content: finalResponse,
-              mode: editorMode === 'code' ? interactionMode : undefined,
+              mode: editorMode === 'code' ? (options?.modeOverride ?? interactionMode) : undefined,
               sourceDocument: currentCodeDocument || undefined
             }
           ])
@@ -679,6 +725,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
       })
 
       unsubscribeError = window.api.aiOnStreamError(sessionId, (error: string) => {
+        if (currentSessionIdRef.current !== sessionId) return
         setMessages((prev) => [
           ...prev,
           {
@@ -693,8 +740,12 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
         setIsLoading(false)
       })
 
-      await window.api.aiStreamCompletion(selectedModel, requestMessages, {}, sessionId)
+      const result = await window.api.aiStreamCompletion(selectedModel, requestMessages, {}, sessionId)
+      if (!result.success) {
+        throw new Error(result.error || 'AI stream failed')
+      }
     } catch (error) {
+      if (currentSessionIdRef.current !== sessionId) return
       console.error('Failed to send message:', error)
       setMessages((prev) => [
         ...prev,
@@ -716,7 +767,10 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
   }
 
   const handleAgentRun = async (prompt: string): Promise<void> => {
+    const editRunId = `edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    currentEditRunIdRef.current = editRunId
     const currentCodeDocument = getCurrentCodeDocument()
+    const currentContextText = resolveCurrentContextText()
     const requestMessages: AIMessage[] = [
       {
         role: 'system',
@@ -726,11 +780,11 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
           currentDocument: currentCodeDocument
         })
       },
-      ...(contextText
+      ...(currentContextText
         ? [
             {
               role: 'system' as const,
-              content: `当前选中的代码引用如下，请在必要时优先参考它：\n\n${contextText}`
+              content: `当前选中的代码引用如下，请在必要时优先参考它：\n\n${currentContextText}`
             }
           ]
         : []),
@@ -739,9 +793,15 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
 
     setMessages((prev) => [
       ...prev,
-      { id: createMessageId('user'), role: 'user', content: prompt, mode: 'agent' as const }
+      { id: createMessageId('user'), role: 'user', content: prompt, mode: 'edit' as const }
     ])
     setInput('')
+    setContextText(currentContextText)
+    if (currentContextText) {
+      setAIContextText(currentContextText)
+    } else {
+      clearAIContextText()
+    }
     setPendingCommand(null)
     setStreamingResponse('')
     currentResponseRef.current = ''
@@ -779,7 +839,8 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
       agentMessages: AIMessage[],
       eventId: string
     ): Promise<string> => {
-      const sessionId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const sessionId = `edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const staleStreamMessage = '本次 Edit 生成已被新的请求或内容切换中断。'
       currentSessionIdRef.current = sessionId
       currentResponseRef.current = ''
       setStreamingResponse('')
@@ -790,6 +851,12 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
 
       const completion = new Promise<string>((resolve, reject) => {
         unsubscribeChunk = window.api.aiOnStreamChunk(sessionId, (chunk: string) => {
+          if (
+            currentSessionIdRef.current !== sessionId ||
+            currentEditRunIdRef.current !== editRunId
+          ) {
+            return
+          }
           responseBuffer += chunk
           currentResponseRef.current = responseBuffer
           const parsedResponse = parseAgentResponse(responseBuffer)
@@ -817,24 +884,48 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
         })
 
         unsubscribeComplete = window.api.aiOnStreamComplete(sessionId, () => {
+          if (
+            currentSessionIdRef.current !== sessionId ||
+            currentEditRunIdRef.current !== editRunId
+          ) {
+            reject(new Error(staleStreamMessage))
+            return
+          }
           resolve(responseBuffer.trim())
         })
 
         unsubscribeError = window.api.aiOnStreamError(sessionId, (error: string) => {
+          if (
+            currentSessionIdRef.current !== sessionId ||
+            currentEditRunIdRef.current !== editRunId
+          ) {
+            reject(new Error(staleStreamMessage))
+            return
+          }
           reject(new Error(error))
         })
       })
 
       try {
-        await window.api.aiStreamCompletion(selectedModel, agentMessages, {}, sessionId)
+        const result = await window.api.aiStreamCompletion(
+          selectedModel,
+          agentMessages,
+          { toolMode: 'code-edit' },
+          sessionId
+        )
+        if (!result.success) {
+          throw new Error(result.error || 'AI stream failed')
+        }
         return await completion
       } finally {
         unsubscribeChunk?.()
         unsubscribeComplete?.()
         unsubscribeError?.()
-        currentResponseRef.current = ''
-        currentSessionIdRef.current = null
-        setStreamingResponse('')
+        if (currentSessionIdRef.current === sessionId) {
+          currentResponseRef.current = ''
+          currentSessionIdRef.current = null
+          setStreamingResponse('')
+        }
       }
     }
 
@@ -849,7 +940,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
         const eventId = `modify-current-file-${attempt}`
         updateToolEvent({
           id: eventId,
-          label: attempt === 1 ? '正在等待修改工具调用' : `正在重试修改工具调用 ${attempt}`,
+          label: attempt === 1 ? '正在分析请求' : `正在重新分析请求 ${attempt}`,
           status: 'running'
         })
 
@@ -862,12 +953,11 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
         if (!parsed.toolCall) {
           if (workingDraft !== currentCodeDocument) {
             const diffLines = buildLineDiff(currentCodeDocument, workingDraft)
-            replaceCodeDocument(workingDraft)
             setWorkspaceSession((prev) =>
               prev
                 ? {
                     ...prev,
-                    status: 'applied',
+                    status: 'ready',
                     sourceDocument: currentCodeDocument,
                     draftDocument: workingDraft,
                     responseContent: finalResponse,
@@ -886,22 +976,6 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
             return
           }
 
-          if (attempt === 1) {
-            agentMessages.push(
-              { role: 'assistant', content: finalResponse },
-              {
-                role: 'system',
-                content:
-                  '你只描述了修改结果，但没有实际修改代码。请用以下任意一种方式来实施修改：\n' +
-                  '1. 输出 ```tool_call 代码块调用 modify_current_file（见系统提示中的示例）\n' +
-                  '2. 输出可应用的 patch / unified diff\n' +
-                  '3. 直接输出修改后的完整文件内容，放在对应语言的 ``` 代码块中\n' +
-                  '如果你认为不需要修改，请解释原因。'
-              }
-            )
-            continue
-          }
-
           setWorkspaceSession(null)
           if (finalResponse) {
             setMessages((prev) => [
@@ -910,7 +984,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
                 id: createMessageId('assistant'),
                 role: 'assistant',
                 content: finalResponse,
-                mode: 'agent',
+                mode: 'edit',
                 sourceDocument: currentCodeDocument || undefined
               }
             ])
@@ -927,7 +1001,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
               id: createMessageId('assistant'),
               role: 'assistant',
               content: lastError,
-              mode: 'agent',
+              mode: 'edit',
               sourceDocument: currentCodeDocument || undefined
             }
           ])
@@ -937,7 +1011,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
         if (!SUPPORTED_AGENT_WRITE_TOOLS.has(parsed.toolCall.name)) {
           lastError =
             `未知工具：${getToolCallLabel(parsed.toolCall.name)}。` +
-            '当前 agent 仅支持单文件写入结果：modify_current_file、patch、diff 或完整文件替换。'
+            '当前 Edit 模式仅支持单内容写入结果：modify_current_file、patch、diff 或完整内容替换。'
           updateToolEvent({
             id: eventId,
             label: '修改工具执行失败',
@@ -971,15 +1045,15 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
           const diffLines = buildLineDiff(currentCodeDocument, workingDraft)
           updateToolEvent({
             id: eventId,
-            label: '已更新当前内容',
-            detail: toolSummary || '修改工具执行成功',
+            label: '已生成修改草稿',
+            detail: toolSummary || '修改草稿生成成功',
             status: 'done'
           })
           setWorkspaceSession((prev) =>
             prev
               ? {
                   ...prev,
-                  status: 'generating',
+                  status: 'ready',
                   sourceDocument: currentCodeDocument,
                   draftDocument: workingDraft,
                   responseContent: finalResponse,
@@ -995,29 +1069,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
                 }
               : prev
           )
-          agentMessages.push(
-            { role: 'assistant', content: finalResponse },
-            {
-              role: 'system',
-              content:
-                `tool_result:\n` +
-                JSON.stringify(
-                  {
-                    tool: parsed.toolCall.name,
-                    success: true,
-                    summary: toolSummary,
-                    result: {
-                      draftDocument: workingDraft,
-                      diffStats: countDiffStats(diffLines)
-                    }
-                  },
-                  null,
-                  2
-                ) +
-                `\n请判断这个工具结果是否已经满足用户要求。满足就直接普通回答结束，不要再调用工具；不满足就继续返回单文件写入结果，且必须基于 tool_result.result.draftDocument。`
-            }
-          )
-          continue
+          return
         }
 
         lastError = previewIssue || '修改工具没有生成可应用的结果。'
@@ -1042,12 +1094,11 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
 
       if (workingDraft !== currentCodeDocument) {
         const diffLines = buildLineDiff(currentCodeDocument, workingDraft)
-        replaceCodeDocument(workingDraft)
         setWorkspaceSession((prev) =>
           prev
             ? {
                 ...prev,
-                status: 'applied',
+                status: 'ready',
                 sourceDocument: currentCodeDocument,
                 draftDocument: workingDraft,
                 responseContent: lastResponse,
@@ -1079,6 +1130,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
           : prev
       )
     } catch (error) {
+      if (currentEditRunIdRef.current !== editRunId) return
       console.error('Failed to run agent:', error)
       const errorMessage = error instanceof Error ? error.message : '请求失败，请稍后重试。'
       setWorkspaceSession((prev) =>
@@ -1108,10 +1160,13 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
             }
       )
     } finally {
-      setStreamingResponse('')
-      currentResponseRef.current = ''
-      currentSessionIdRef.current = null
-      setIsLoading(false)
+      if (currentEditRunIdRef.current === editRunId) {
+        setStreamingResponse('')
+        currentResponseRef.current = ''
+        currentSessionIdRef.current = null
+        currentEditRunIdRef.current = null
+        setIsLoading(false)
+      }
     }
   }
 
@@ -1122,7 +1177,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     const prompt = (promptOverride ?? input).trim()
     if (!prompt || !selectedModel || isLoading) return
 
-    if (editorMode === 'code' && interactionMode === 'agent') {
+    if (editorMode === 'code' && interactionMode === 'edit') {
       await handleAgentRun(prompt)
       return
     }
@@ -1133,6 +1188,8 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
   const handleStopGeneration = async (): Promise<void> => {
     const sessionId = currentSessionIdRef.current
     if (!sessionId || !isLoading) return
+    const partialResponse = currentResponseRef.current.trim()
+    const interruptedWorkspace = workspaceSession?.status === 'generating' ? workspaceSession : null
 
     try {
       await window.api.aiCancelStream(sessionId)
@@ -1143,15 +1200,35 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
       setIsLoading(false)
       setStreamingResponse('')
       currentResponseRef.current = ''
-      setWorkspaceSession((prev) =>
-        prev && prev.status === 'generating'
-          ? {
-              ...prev,
-              status: 'failed',
-              error: '本次生成已被手动中断。'
-            }
-          : prev
-      )
+      currentEditRunIdRef.current = null
+
+      if (interruptedWorkspace) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: createMessageId('assistant-interrupted'),
+            role: 'assistant',
+            content: partialResponse
+              ? `已停止 Edit 生成，本次没有应用任何修改。\n\n已生成的部分内容：\n\n${partialResponse}`
+              : '已停止 Edit 生成，本次没有应用任何修改。',
+            mode: 'edit',
+            sourceDocument: interruptedWorkspace.sourceDocument || undefined
+          }
+        ])
+        setWorkspaceSession(null)
+        return
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createMessageId('assistant-interrupted'),
+          role: 'assistant',
+          content: partialResponse
+            ? `已停止生成。\n\n已生成的部分内容：\n\n${partialResponse}`
+            : '已停止生成。'
+        }
+      ])
     }
   }
 
@@ -1230,6 +1307,10 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
   const handleAcceptWorkspaceDraft = (): void => {
     if (!workspaceSession) return
 
+    if (editorMode === 'code' && workspaceSession.draftDocument) {
+      replaceCodeDocument(workspaceSession.draftDocument)
+    }
+
     const diffStats = countDiffStats(workspaceSession.diffLines)
     const summaryLines = workspaceSession.summaryLines
       .map((line) => line.trim())
@@ -1248,7 +1329,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
         id: messageId,
         role: 'assistant',
         content,
-        mode: 'agent',
+        mode: 'edit',
         sourceDocument: workspaceSession.sourceDocument || undefined,
         agentResult: {
           kind: 'applied',
@@ -1274,20 +1355,42 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
   }
 
   const handleDiscardWorkspaceDraft = (): void => {
+    if (workspaceSession) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createMessageId('assistant-edit-closed'),
+          role: 'assistant',
+          content:
+            workspaceSession.status === 'failed'
+              ? `已关闭失败的 Edit 任务：${workspaceSession.error || '修改失败。'}`
+              : '已关闭本次 Edit 任务，未应用任何修改。',
+          mode: 'edit',
+          sourceDocument: workspaceSession.sourceDocument || undefined
+        }
+      ])
+    }
     setWorkspaceSession(null)
   }
 
   const handleRetryWorkspace = (): void => {
     if (!workspaceSession?.prompt || isLoading) return
-    if (workspaceSession.sourceDocument && editorMode === 'code') {
-      replaceCodeDocument(workspaceSession.sourceDocument)
-    }
     void handleAgentRun(workspaceSession.prompt)
   }
 
   const handleDiscardApplied = (): void => {
-    if (workspaceSession?.sourceDocument && editorMode === 'code') {
-      replaceCodeDocument(workspaceSession.sourceDocument)
+    if (workspaceSession) {
+      const diffStats = countDiffStats(workspaceSession.diffLines)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createMessageId('assistant-edit-discarded'),
+          role: 'assistant',
+          content: `已放弃本次 Edit 修改，未应用到当前代码。\n\n变更预览：+${diffStats.added} / -${diffStats.removed}`,
+          mode: 'edit',
+          sourceDocument: workspaceSession.sourceDocument || undefined
+        }
+      ])
     }
     setWorkspaceSession(null)
   }
@@ -1310,12 +1413,12 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
   const quickActions = [
     {
       id: 'explain',
-      label: editorMode === 'code' ? (interactionMode === 'agent' ? 'Audit' : 'Explain') : '总结',
+      label: editorMode === 'code' ? (interactionMode === 'edit' ? 'Audit' : 'Explain') : '总结',
       icon: MessageSquareQuote,
       prompt:
         editorMode === 'code'
-          ? interactionMode === 'agent'
-                      ? '请像通用代码 agent 一样接管当前代码内容，先判断最值得处理的结构、缺陷和风险，再直接给出可应用的单内容修改结果。'
+          ? interactionMode === 'edit'
+            ? '请审阅当前代码内容，先判断最值得处理的结构、缺陷和风险，再直接给出可应用的单内容修改结果。'
             : '请解释当前代码内容的作用、关键逻辑、潜在风险，并给出简短改进建议。'
           : '请总结这段内容的核心意思、结构和语气特点，并给出简短优化建议。'
     },
@@ -1331,12 +1434,12 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
     {
       id: 'optimize',
       label:
-        editorMode === 'code' ? (interactionMode === 'agent' ? 'Take Over' : 'Optimize') : '润色',
+        editorMode === 'code' ? (interactionMode === 'edit' ? 'Edit' : 'Optimize') : '润色',
       icon: Sparkles,
       prompt:
         editorMode === 'code'
-          ? interactionMode === 'agent'
-            ? '请像通用代码 agent 一样接管当前代码内容，围绕可维护性和清晰度做一次完整改造，返回结构化改动提示、最终 unified diff，并说明验证方式。'
+          ? interactionMode === 'edit'
+            ? '请围绕当前代码内容的可维护性和清晰度做一次完整改造，返回结构化改动提示、最终 unified diff，并说明验证方式。'
             : '请优化这段代码的可读性、结构和性能，并给出改进后的版本。'
           : '请在不改变原意的前提下润色这段内容，让表达更凝练。'
     },
@@ -1485,7 +1588,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
   const canApplyResponse = canApplyToWordEditor || canApplyToCodeEditor
   const modeOptions: Array<{ id: AISidebarMode; label: string }> = [
     { id: 'ask', label: 'Ask' },
-    { id: 'agent', label: 'Agent' }
+    { id: 'edit', label: 'Edit' }
   ]
   const regularMessages = messages
   const workspaceFileName = selectedNote?.title || '当前内容'
@@ -1521,7 +1624,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
                 ) : null}
                 <span className="text-[11px] text-muted-foreground">
                   {editorMode === 'code'
-                    ? '修改自动应用，可 Accept 或 Retry'
+                    ? '生成可审阅修改，可 Accept 或 Retry'
                     : hasContext
                       ? '已附带选中文本引用'
                       : '可直接分析当前选中内容'}
@@ -1554,23 +1657,23 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
           <div className="mt-3 overflow-hidden rounded-2xl border border-border/75 bg-background/70 shadow-[0_18px_48px_rgba(0,0,0,0.04)]">
             <div className="h-px w-full bg-gradient-to-r from-primary/35 via-primary/10 to-transparent" />
             <div className="p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <PencilRuler className="size-3.5" />
-                当前引用
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <PencilRuler className="size-3.5" />
+                  当前引用
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1.5 text-xs"
+                  onClick={handleClearContext}
+                >
+                  <X className="size-3.5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-1.5 text-xs"
-                onClick={handleClearContext}
-              >
-                <X className="size-3.5" />
-              </Button>
-            </div>
-            <p className="line-clamp-5 whitespace-pre-wrap text-xs leading-5 text-foreground/90">
-              {contextText}
-            </p>
+              <p className="line-clamp-5 whitespace-pre-wrap text-xs leading-5 text-foreground/90">
+                {contextText}
+              </p>
             </div>
           </div>
         ) : null}
@@ -1582,15 +1685,15 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
             <div className="rounded-[22px] border border-border/70 bg-background/82 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.05)] backdrop-blur">
               <div className="mb-3 flex items-center gap-2 text-sm font-medium">
                 <Bot className="size-4 text-primary" />
-                {editorMode === 'code' && interactionMode === 'agent'
-                  ? '开始 Agent 代码修改'
+                {editorMode === 'code' && interactionMode === 'edit'
+                  ? '开始 Edit 代码修改'
                   : '开始一个侧边对话'}
               </div>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
                   {editorMode === 'code'
-                    ? interactionMode === 'agent'
-                      ? 'Agent 会执行结构化代码修改工具，先生成若干改动提示与最终 diff，待你审批后再应用。'
+                    ? interactionMode === 'edit'
+                      ? 'Edit 会围绕当前代码生成结构化修改和最终 diff，待你审批后再应用。'
                       : 'Ask 会围绕当前代码内容直接解释、分析、修改或优化。'
                     : '可以像 VS Code 侧栏 AI 一样直接围绕当前文档工作。'}
                 </p>
@@ -1602,7 +1705,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
                   </div>
                   <div className="rounded-xl border border-dashed border-primary/25 bg-primary/6 px-3 py-2.5">
                     {editorMode === 'code'
-                      ? 'Agent: 逐步生成改动提示，最后给出完整 diff'
+                      ? 'Edit: 生成可审阅 diff，确认后应用到当前代码'
                       : '按当前语气续写或重写内容'}
                   </div>
                   {editorMode !== 'code' ? (
@@ -1627,7 +1730,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
             const isAppliedAgentResult =
               !isUser &&
               editorMode === 'code' &&
-              message.mode === 'agent' &&
+              message.mode === 'edit' &&
               message.agentResult?.kind === 'applied'
             const isDiffOpen = openDiffMessageKey === messageKey
             const copyActions: MessageAction[] = isUser
@@ -1959,17 +2062,22 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
                   <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 px-3 py-2.5 text-xs text-muted-foreground">
                     <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
                     <span className="truncate">
-                      {getToolCallSummary(workspaceSession.toolCall) || '正在修改代码...'}
+                      {workspaceSession.toolCall
+                        ? getToolCallSummary(workspaceSession.toolCall) || '正在生成修改草稿...'
+                        : '正在分析请求...'}
                     </span>
                   </div>
                 ) : null}
 
-                {workspaceSession.status === 'applied' && workspaceSession.actionable ? (
+                {workspaceSession.status === 'ready' && workspaceSession.actionable ? (
                   <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/90 shadow-sm">
                     <div className="flex items-center justify-between gap-2 px-3 py-2.5">
                       <div className="flex min-w-0 items-center gap-2">
                         <FilePenLine className="size-3.5 shrink-0 text-primary" />
                         <span className="truncate text-sm font-medium">{workspaceFileName}</span>
+                        <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                          待确认
+                        </span>
                       </div>
                       {workspaceHasDiff ? (
                         <div className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium tabular-nums">
@@ -2031,7 +2139,7 @@ export function AISidebar({ className, editorMode = 'word' }: AISidebarProps): R
                         onClick={handleDiscardApplied}
                       >
                         <Trash2 className="mr-1 size-3" />
-                        Discard
+                        Close
                       </Button>
                     </div>
                   </div>
