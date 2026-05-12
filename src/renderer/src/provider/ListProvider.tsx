@@ -408,6 +408,9 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateNoteTags = useCallback(
     (id: string, tags: Tag[]) => {
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, tags } : n)))
+      setAllNotesCache((prev) =>
+        prev ? prev.map((n) => (n.id === id ? { ...n, tags } : n)) : prev
+      )
       if (selectedNoteRef.current?.id === id) {
         commitSelectedNote({ ...selectedNoteRef.current, tags })
       }

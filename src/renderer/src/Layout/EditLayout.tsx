@@ -246,7 +246,13 @@ const EditLayout = (): React.JSX.Element => {
 
             {/* 侧边栏 */}
             <div className="shrink-0 overflow-hidden" style={{ width: `${aiSidebarWidth}px` }}>
-              <AISidebar className="h-full" editorMode={editorMode} />
+              <AISidebar
+                className="h-full"
+                editorMode={editorMode}
+                currentDocumentContent={
+                  editorMode === 'code' ? codeContent : editor?.getText() || ''
+                }
+              />
             </div>
           </>
         )}

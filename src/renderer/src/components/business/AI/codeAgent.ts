@@ -62,26 +62,22 @@ export function buildCodeAgentSystemPrompt(params: {
   const { title, language, currentDocument } = params
 
   return (
-    `你现在处于代码 Agent 模式，同时也是一个通用代码代理。` +
-    `你需要优先完成用户目标，而不是机械地输出 diff。` +
-    `你可以自行决定是直接回答、先分析、指出风险、请求补充信息，还是调用代码修改工具。\n\n` +
+    `你现在处于代码 Edit 模式，是当前代码内容的单文件修改助手。` +
+    `你需要优先完成用户目标，而不是机械地修改代码。` +
+    `如果用户只是提问、解释、排查思路或询问概念，请直接回答，不要调用修改工具。` +
+    `只有当用户明确要求修改、修复、重构、优化、替换、删除、新增或应用代码变更时，才调用 modify_current_file 工具。\n\n` +
     `写权限边界：你只能修改当前代码内容，不能假设自己可以读取或改写其他文件。` +
     `当前内容标题：${title}；语言：${language}。\n\n` +
-    `工具调用必须写成一个 \`\`\`tool_call JSON code block，本应用会读取工具调用并展示工具状态。\n\n` +
     `可用工具声明：\n` +
     `1. modify_current_file(arguments)\n` +
     `   用途：修改当前代码草稿，并返回待本地执行的修改参数。\n` +
     `   arguments schema：{"summary": "一句话说明正在改什么", "mode": "unified_diff|replace_file", "diff": "mode 为 unified_diff 时必填，可应用到当前草稿的 unified diff", "content": "mode 为 replace_file 时必填，替换后的完整文件内容", "changes": [{"title": "改动标题", "diff": "该改动的 diff 片段"}]}\n\n` +
     `下面是当前代码内容的完整文本，这是你唯一允许修改的对象：\n\n` +
     `${currentDocument}\n\n` +
-    `【核心规则】当用户要求修改代码时，你必须通过以下两种方式之一来实施修改，绝不能只用文字描述结果：\n\n` +
-    `方式 A（推荐，适合局部改动）：输出 tool_call 代码块调用 modify_current_file\n` +
-    `\`\`\`tool_call\n{"name":"modify_current_file","arguments":{"summary":"为每项添加 name 属性","mode":"unified_diff","diff":"--- a/file\\n+++ b/file\\n@@ -1,4 +1,5 @@\\n const x = [\\n   {\\n+    name: 'foo',\\n     title: 'foo'\\n   }\\n ]"}}\n\`\`\`\n\n` +
-    `方式 B（备选，适合改动较多时）：直接输出修改后的完整文件内容，放在对应语言的代码块中，例如：\n` +
-    `\`\`\`${language}\n// 完整修改后的代码...\n\`\`\`\n\n` +
     `其他规则：\n` +
-    `- 仅当用户是在询问/分析代码（无需任何修改）时，才直接用自然语言回答。\n` +
-    `- 工具执行结果会返回给你，不满足要求时继续修改。\n` +
+    `- 询问/分析类请求必须直接自然语言回答，不要生成 diff。\n` +
+    `- 需要修改时优先用 unified_diff，改动很大时再用 replace_file。\n` +
+    `- 工具执行结果会返回给你，不满足要求时可以继续修改。\n` +
     `- 信息不足时说明缺什么，不要猜测。`
   )
 }
@@ -225,8 +221,10 @@ export function isNonActionableToolCall(toolCall: AgentToolCall | null): boolean
 
 export function parseAgentResponse(content: string): AgentResponseParts {
   const toolCall = extractToolCall(content)
-  const code = getToolCallContent(toolCall) || extractExecutableCodeBlocks(content)[0] || ''
   const body = extractBodyContent(content)
+  const executableCodeBlocks = extractExecutableCodeBlocks(content)
+  const fallbackCode = toolCall || !body ? executableCodeBlocks[0] || '' : ''
+  const code = getToolCallContent(toolCall) || fallbackCode
   const patches = getToolCallPatches(toolCall)
   const unifiedDiff = getToolCallDiff(toolCall) || extractUnifiedDiff(content)
   const changePreviews = getToolCallChanges(toolCall)

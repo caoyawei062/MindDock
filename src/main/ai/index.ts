@@ -2,7 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createDeepSeek } from '@ai-sdk/deepseek'
-import { streamText, generateText } from 'ai'
+import { streamText, generateText, jsonSchema, tool, stepCountIs } from 'ai'
 import { AIModelConfig, AIMessage, AICompletionOptions, AIStreamCallback } from './types'
 import { aiConfigManager } from './config'
 
@@ -13,6 +13,57 @@ type SupportedLanguageModel =
   | ReturnType<ReturnType<typeof createDeepSeek>>
 
 type SDKMessage = NonNullable<Parameters<typeof streamText>[0]['messages']>[number]
+
+const codeEditTools = {
+  modify_current_file: tool({
+    description:
+      'Use this only when the user explicitly wants the current code content changed. Return either a unified diff for local edits or full replacement content for larger rewrites.',
+    inputSchema: jsonSchema<{
+      summary: string
+      mode: 'unified_diff' | 'replace_file'
+      diff?: string
+      content?: string
+      changes?: Array<{ title: string; diff: string }>
+    }>({
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        summary: {
+          type: 'string',
+          description: 'One sentence summary of the proposed code change.'
+        },
+        mode: {
+          type: 'string',
+          enum: ['unified_diff', 'replace_file'],
+          description: 'Use unified_diff for focused edits, replace_file for larger rewrites.'
+        },
+        diff: {
+          type: 'string',
+          description: 'Unified diff applicable to the current code content. Required for unified_diff.'
+        },
+        content: {
+          type: 'string',
+          description: 'Full replacement code content. Required for replace_file.'
+        },
+        changes: {
+          type: 'array',
+          description: 'Optional preview list of important changes.',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              title: { type: 'string' },
+              diff: { type: 'string' }
+            },
+            required: ['title', 'diff']
+          }
+        }
+      },
+      required: ['summary', 'mode']
+    }),
+    execute: async (input) => input
+  })
+}
 
 /**
  * AI 服务类
@@ -126,17 +177,39 @@ export class AIService {
     this.activeStreams.set(sessionId, abortController)
 
     try {
+      const useCodeEditTools = options.toolMode === 'code-edit'
       const result = await streamText({
         model,
         messages: convertedMessages,
+        tools: useCodeEditTools ? codeEditTools : undefined,
+        toolChoice: useCodeEditTools ? 'auto' : undefined,
+        stopWhen: useCodeEditTools ? stepCountIs(2) : undefined,
         temperature: options.temperature ?? 0.7,
         topP: options.topP,
         maxOutputTokens: options.maxTokens,
         abortSignal: abortController.signal
       })
 
-      for await (const chunk of result.textStream) {
-        onChunk(chunk)
+      if (useCodeEditTools) {
+        for await (const part of result.fullStream) {
+          if (part.type === 'text-delta') {
+            onChunk(part.text)
+            continue
+          }
+
+          if (part.type === 'tool-call' && part.toolName === 'modify_current_file') {
+            onChunk(
+              `\n\`\`\`tool_call\n${JSON.stringify({
+                name: part.toolName,
+                arguments: part.input
+              })}\n\`\`\`\n`
+            )
+          }
+        }
+      } else {
+        for await (const chunk of result.textStream) {
+          onChunk(chunk)
+        }
       }
 
       // 等待流完成

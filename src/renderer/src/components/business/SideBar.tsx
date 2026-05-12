@@ -184,6 +184,11 @@ export function AppSidebar(): React.JSX.Element {
             </SidebarGroup>
           )}
 
+          <div
+            className="min-h-12 flex-1 cursor-default"
+            aria-label="返回欢迎页"
+            onClick={() => setSelectedNote(null)}
+          />
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
