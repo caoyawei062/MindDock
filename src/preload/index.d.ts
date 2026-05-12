@@ -62,7 +62,7 @@ interface AIStreamResponse {
   error?: string
 }
 
-type AppCommand = 'save-current-note' | 'new-document' | 'focus-search'
+type AppCommand = 'save-current-note' | 'new-document' | 'new-snippet' | 'focus-search'
 
 interface AIGenerateResponse {
   success: boolean

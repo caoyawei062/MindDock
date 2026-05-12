@@ -23,7 +23,7 @@ let mainWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
 let isQuitting = false
 
-type AppCommand = 'save-current-note' | 'new-document' | 'focus-search'
+type AppCommand = 'save-current-note' | 'new-document' | 'new-snippet' | 'focus-search'
 
 interface WindowsOverlayConfig {
   color: string
@@ -61,6 +61,24 @@ function dispatchAppCommand(command: AppCommand): void {
   mainWindow.webContents.send('app-command', command)
 }
 
+function focusMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (!mainWindow.isVisible()) {
+    mainWindow.show()
+  }
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore()
+  }
+  mainWindow.focus()
+}
+
+export function openMainWindowWithCommand(command?: AppCommand): void {
+  focusMainWindow()
+  if (command) {
+    dispatchAppCommand(command)
+  }
+}
+
 function createAppMenu(): void {
   const isMac = process.platform === 'darwin'
 
@@ -94,6 +112,11 @@ function createAppMenu(): void {
           label: 'New Document',
           accelerator: 'CmdOrCtrl+N',
           click: () => dispatchAppCommand('new-document')
+        },
+        {
+          label: 'New Code Snippet',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => dispatchAppCommand('new-snippet')
         },
         {
           label: 'Save',

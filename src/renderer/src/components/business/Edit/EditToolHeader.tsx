@@ -123,6 +123,8 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
   const inputRef = useRef<HTMLInputElement>(null)
   const isTitleComposingRef = useRef(false)
   const pendingTitleBlurRef = useRef(false)
+  const isWindows = useMemo(() => navigator.userAgent.toLowerCase().includes('windows'), [])
+  const windowsControlInset = isWindows ? 144 : 0
 
   // 处理 AI 按钮点击
   const handleAIButtonClick = useCallback(() => {
@@ -554,7 +556,17 @@ const EditToolHeader: React.FC<EditToolHeaderProps> = ({
         </DialogContent>
       </Dialog>
 
-      <div className="relative flex items-center justify-between px-2 py-1.5 border-b border-border/50 drag">
+      <div
+        className="relative flex items-center justify-between px-2 py-1.5 border-b border-border/50 drag"
+        style={
+          isWindows
+            ? {
+                minHeight: 40,
+                paddingRight: `${windowsControlInset + 8}px`
+              }
+            : undefined
+        }
+      >
         <div className="flex items-center gap-1">
           {leftButtons.map(renderButtonByType)}
           {mode === 'code' && (

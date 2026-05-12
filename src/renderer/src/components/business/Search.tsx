@@ -253,11 +253,15 @@ const Search: React.FC = () => {
         void handleCreateDocument()
       }
 
+      if (command === 'new-snippet') {
+        void handleCreateSnippet()
+      }
+
       if (command === 'focus-search') {
         openPalette()
       }
     })
-  }, [handleCreateDocument, openPalette])
+  }, [handleCreateDocument, handleCreateSnippet, openPalette])
 
   const handleInputKeyDown = React.useCallback(
     async (event: React.KeyboardEvent<HTMLInputElement>) => {

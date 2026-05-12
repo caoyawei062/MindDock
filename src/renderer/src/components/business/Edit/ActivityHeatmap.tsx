@@ -98,15 +98,15 @@ export const ActivityHeatmap: React.FC<Props> = ({ notes }) => {
   const DAY_LABEL_WIDTH = 28
 
   return (
-    <div className="w-full max-w-2xl">
-      <div className="flex items-baseline gap-2 mb-3">
-        <span className="text-sm font-medium">
-          过去一年活跃 <span className="text-primary">{activeDays}</span> 天
-        </span>
-        <span className="text-xs text-muted-foreground">共 {totalEdits} 次编辑</span>
-      </div>
+    <div className="w-full overflow-x-auto">
+      <div className="mx-auto w-fit">
+        <div className="flex items-baseline gap-2 mb-3">
+          <span className="text-sm font-medium">
+            过去一年活跃 <span className="text-primary">{activeDays}</span> 天
+          </span>
+          <span className="text-xs text-muted-foreground">共 {totalEdits} 次编辑</span>
+        </div>
 
-      <div className="overflow-x-auto">
         <div className="inline-block min-w-max">
           {/* Month labels */}
           <div className="relative h-4 mb-1" style={{ marginLeft: DAY_LABEL_WIDTH }}>
